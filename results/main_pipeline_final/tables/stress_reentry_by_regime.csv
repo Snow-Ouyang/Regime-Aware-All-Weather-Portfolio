@@ -1,0 +1,5 @@
+refined_regime_at_exit,exit_count,reentry_5d_count,reentry_5d_rate,reentry_10d_count,reentry_10d_rate,reentry_20d_count,reentry_20d_rate,mean_days_until_next_entry,most_common_next_entry_trigger,mean_strategy_return_next_20d,mean_SPY_return_next_20d
+FLAT_HIGH_RATE,8,0,0.0,1,0.125,2,0.25,101.71428571428571,VIX,0.010332616671610631,0.011807113873871553
+FLAT_LOW_RATE,8,1,0.125,1,0.125,3,0.375,80.5,VIX,0.0507906751761418,0.018528600411898036
+INVERTED,2,0,0.0,0,0.0,0,0.0,388.5,VIX,-0.01691563957734149,-0.014433337655024636
+STEEP,17,0,0.0,0,0.0,3,0.17647058823529413,108.29411764705883,CMDTY,0.012686349464750375,0.015258070883785313

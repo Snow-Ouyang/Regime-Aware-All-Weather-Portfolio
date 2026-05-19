@@ -1,0 +1,8 @@
+trigger,status,diff_days,first_diff_date,last_diff_date
+FLAT_VIX_STRESS,same,0,,
+FLAT_CREDIT_DD5_STRESS,same,0,,
+STEEP_EITHER_SELL_STRESS,same,0,,
+STEEP_CREDIT_DD5_STRESS,same,0,,
+STEEP_CMDTY_RET60_NEG10,same,0,,
+BACKBONE_V2_ENTRY_SIGNAL,same,0,,
+R3_RECOVERY,same,0,,

@@ -1,0 +1,10 @@
+name,path,exists
+asset_returns,data/processed/assets/daily_returns.csv,True
+asset_prices,data/processed/assets/daily_adjusted_close.csv,True
+regime_inputs,data/processed/regime_inputs_simplified.csv,True
+dgs10,data/raw/macro/rate/DGS10.csv,True
+dgs1,data/raw/macro/rate/DGS1.csv,True
+dtb3,data/raw/macro/rate/DTB3.csv,True
+vix,data/raw/macro/volatility/VIXCLS.csv,True
+waaa,data/raw/macro/Credit/WAAA.csv,True
+wbaa,data/raw/macro/Credit/WBAA.csv,True

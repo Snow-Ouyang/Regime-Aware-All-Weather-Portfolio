@@ -1,0 +1,11 @@
+script,status,forbidden_reference,line,reason
+scripts/01_data_prepare.py,PASS,,,no forbidden results dependency detected
+scripts/02_rule_based_regime.py,PASS,,,no forbidden results dependency detected
+scripts/03_stress_detection.py,PASS,,,no forbidden results dependency detected
+scripts/04_asset_return_panel.py,PASS,,,no forbidden results dependency detected
+scripts/05_baseline_strategy.py,PASS,,,no forbidden results dependency detected
+scripts/06_flat_rate_refined_strategy.py,PASS,,,no forbidden results dependency detected
+scripts/07_cross_state_asset_behavior.py,PASS,,,no forbidden results dependency detected
+scripts/08_stress_trigger_diagnostics.py,PASS,,,no forbidden results dependency detected
+scripts/09_final_strategy_recovery_flat_low_only.py,PASS,,,no forbidden results dependency detected
+scripts/10_final_report_outputs.py,PASS,,,no forbidden results dependency detected

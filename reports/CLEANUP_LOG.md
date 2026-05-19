@@ -1,0 +1,118 @@
+﻿# Cleanup Log
+
+Generated: 2026-05-18T18:24:05
+
+Archive: archive/intermediate_outputs_20260518_182405
+
+Kept active:
+- data/raw
+- data/processed
+- scripts
+- src
+- results/main_pipeline_final
+
+Moved out of active tree:
+- moved results/01_regime_discovery -> archive/intermediate_outputs_20260518_182405/results/01_regime_discovery
+- moved results/02_rule_based_regime -> archive/intermediate_outputs_20260518_182405/results/02_rule_based_regime
+- moved results/03_monthly_timing -> archive/intermediate_outputs_20260518_182405/results/03_monthly_timing
+- moved results/04_stress_triggers -> archive/intermediate_outputs_20260518_182405/results/04_stress_triggers
+- moved results/05_recovery -> archive/intermediate_outputs_20260518_182405/results/05_recovery
+- moved results/06_2015_2016_repair -> archive/intermediate_outputs_20260518_182405/results/06_2015_2016_repair
+- moved results/07_cross_state_asset_behavior -> archive/intermediate_outputs_20260518_182405/results/07_cross_state_asset_behavior
+- moved results/08_allocation -> archive/intermediate_outputs_20260518_182405/results/08_allocation
+- moved results/09_final_strategy -> archive/intermediate_outputs_20260518_182405/results/09_final_strategy
+- moved results/absolute_momentum_spy_cash -> archive/intermediate_outputs_20260518_182405/results/absolute_momentum_spy_cash
+- moved results/asset_selection -> archive/intermediate_outputs_20260518_182405/results/asset_selection
+- moved results/asset_universe -> archive/intermediate_outputs_20260518_182405/results/asset_universe
+- moved results/backbone_v2_with_steep_commodity_stress -> archive/intermediate_outputs_20260518_182405/results/backbone_v2_with_steep_commodity_stress
+- moved results/commodity_crash_transmission_by_regime -> archive/intermediate_outputs_20260518_182405/results/commodity_crash_transmission_by_regime
+- moved results/credit_trigger_by_regime_diagnostic -> archive/intermediate_outputs_20260518_182405/results/credit_trigger_by_regime_diagnostic
+- moved results/drawdown_2015_2016_forensic_diagnostic -> archive/intermediate_outputs_20260518_182405/results/drawdown_2015_2016_forensic_diagnostic
+- moved results/faber_spy_cash_timing -> archive/intermediate_outputs_20260518_182405/results/faber_spy_cash_timing
+- moved results/final_strategy_source_only -> archive/intermediate_outputs_20260518_182405/results/final_strategy_source_only
+- moved results/flat_gs10_threshold_robustness -> archive/intermediate_outputs_20260518_182405/results/flat_gs10_threshold_robustness
+- moved results/flat_rate_level_asset_behavior_experiment -> archive/intermediate_outputs_20260518_182405/results/flat_rate_level_asset_behavior_experiment
+- moved results/flat_rate_refined_baseline -> archive/intermediate_outputs_20260518_182405/results/flat_rate_refined_baseline
+- moved results/flat_rate_refined_L50_H30 -> archive/intermediate_outputs_20260518_182405/results/flat_rate_refined_L50_H30
+- moved results/flat_regime_distribution_experiment -> archive/intermediate_outputs_20260518_182405/results/flat_regime_distribution_experiment
+- moved results/flat_risk_gold_cash_diagnostic -> archive/intermediate_outputs_20260518_182405/results/flat_risk_gold_cash_diagnostic
+- moved results/flat_stress_ratio_grid_search -> archive/intermediate_outputs_20260518_182405/results/flat_stress_ratio_grid_search
+- moved results/flat_vix_credit_trigger_diagnostic -> archive/intermediate_outputs_20260518_182405/results/flat_vix_credit_trigger_diagnostic
+- moved results/hedge_asset_cross_state_diagnostic -> archive/intermediate_outputs_20260518_182405/results/hedge_asset_cross_state_diagnostic
+- moved results/hedge_asset_cross_state_diagnostic_extended -> archive/intermediate_outputs_20260518_182405/results/hedge_asset_cross_state_diagnostic_extended
+- moved results/high_frequency_regime_diagnostics -> archive/intermediate_outputs_20260518_182405/results/high_frequency_regime_diagnostics
+- moved results/invvol_window_grid_search -> archive/intermediate_outputs_20260518_182405/results/invvol_window_grid_search
+- moved results/mature_regime_hedge_final -> archive/intermediate_outputs_20260518_182405/results/mature_regime_hedge_final
+- moved results/mature_steep_cmdty_overlay_50spy50ief -> archive/intermediate_outputs_20260518_182405/results/mature_steep_cmdty_overlay_50spy50ief
+- moved results/missed_drawdown_episode_diagnostic -> archive/intermediate_outputs_20260518_182405/results/missed_drawdown_episode_diagnostic
+- moved results/monthly_either_crash_brake_diagnostics -> archive/intermediate_outputs_20260518_182405/results/monthly_either_crash_brake_diagnostics
+- moved results/reconstructed_regime_asset_behavior -> archive/intermediate_outputs_20260518_182405/results/reconstructed_regime_asset_behavior
+- moved results/recovery_20d_equal_weight_attribution -> archive/intermediate_outputs_20260518_182405/results/recovery_20d_equal_weight_attribution
+- moved results/recovery_20d_flat_low_only_L50_H30 -> archive/intermediate_outputs_20260518_182405/results/recovery_20d_flat_low_only_L50_H30
+- moved results/recovery_20d_strategy_test_L50_H30 -> archive/intermediate_outputs_20260518_182405/results/recovery_20d_strategy_test_L50_H30
+- moved results/recovery_test_L50_H30 -> archive/intermediate_outputs_20260518_182405/results/recovery_test_L50_H30
+- moved results/regime -> archive/intermediate_outputs_20260518_182405/results/regime
+- moved results/regime_aware_risk_parity_allocation -> archive/intermediate_outputs_20260518_182405/results/regime_aware_risk_parity_allocation
+- moved results/regime_labeled_sell_lag_diagnostic -> archive/intermediate_outputs_20260518_182405/results/regime_labeled_sell_lag_diagnostic
+- moved results/regime_single_trigger_r3_2d_confirm -> archive/intermediate_outputs_20260518_182405/results/regime_single_trigger_r3_2d_confirm
+- moved results/rule_based_allocation -> archive/intermediate_outputs_20260518_182405/results/rule_based_allocation
+- moved results/rule_based_backtest -> archive/intermediate_outputs_20260518_182405/results/rule_based_backtest
+- moved results/rule_diagnostics -> archive/intermediate_outputs_20260518_182405/results/rule_diagnostics
+- moved results/source_only_after_fix -> archive/intermediate_outputs_20260518_182405/results/source_only_after_fix
+- moved results/source_only_audit -> archive/intermediate_outputs_20260518_182405/results/source_only_audit
+- moved results/spy_cash_backbone_upgrade_ablation -> archive/intermediate_outputs_20260518_182405/results/spy_cash_backbone_upgrade_ablation
+- moved results/spy_timing_episode_analysis -> archive/intermediate_outputs_20260518_182405/results/spy_timing_episode_analysis
+- moved results/stress_exit_recovery_regime_attribution -> archive/intermediate_outputs_20260518_182405/results/stress_exit_recovery_regime_attribution
+- moved results/stress_recovery_grid_search -> archive/intermediate_outputs_20260518_182405/results/stress_recovery_grid_search
+- moved results/trigger_false_alarm_forward_drawdown -> archive/intermediate_outputs_20260518_182405/results/trigger_false_alarm_forward_drawdown
+- moved results/trigger_lock_credit_exit_ma_grid -> archive/intermediate_outputs_20260518_182405/results/trigger_lock_credit_exit_ma_grid
+- moved results/trigger_lock_credit_grid_search -> archive/intermediate_outputs_20260518_182405/results/trigger_lock_credit_grid_search
+- moved results/trigger_lock_recovery_20d_equal_weight_attribution -> archive/intermediate_outputs_20260518_182405/results/trigger_lock_recovery_20d_equal_weight_attribution
+- moved results/trigger_lock_state_machine_v1 -> archive/intermediate_outputs_20260518_182405/results/trigger_lock_state_machine_v1
+- moved results/turnover_diagnostics_and_reduction -> archive/intermediate_outputs_20260518_182405/results/turnover_diagnostics_and_reduction
+- moved figures/01_regime_discovery -> archive/intermediate_outputs_20260518_182405/figures/01_regime_discovery
+- moved figures/02_rule_based_regime -> archive/intermediate_outputs_20260518_182405/figures/02_rule_based_regime
+- moved figures/03_monthly_timing -> archive/intermediate_outputs_20260518_182405/figures/03_monthly_timing
+- moved figures/04_stress_triggers -> archive/intermediate_outputs_20260518_182405/figures/04_stress_triggers
+- moved figures/05_recovery -> archive/intermediate_outputs_20260518_182405/figures/05_recovery
+- moved figures/06_2015_2016_repair -> archive/intermediate_outputs_20260518_182405/figures/06_2015_2016_repair
+- moved figures/07_cross_state_asset_behavior -> archive/intermediate_outputs_20260518_182405/figures/07_cross_state_asset_behavior
+- moved figures/08_allocation -> archive/intermediate_outputs_20260518_182405/figures/08_allocation
+- moved figures/09_final_strategy -> archive/intermediate_outputs_20260518_182405/figures/09_final_strategy
+- moved figures/asset_selection -> archive/intermediate_outputs_20260518_182405/figures/asset_selection
+- moved figures/backbone_v2_with_steep_commodity_stress -> archive/intermediate_outputs_20260518_182405/figures/backbone_v2_with_steep_commodity_stress
+- moved figures/commodity_crash_transmission_by_regime -> archive/intermediate_outputs_20260518_182405/figures/commodity_crash_transmission_by_regime
+- moved figures/credit_trigger_by_regime_diagnostic -> archive/intermediate_outputs_20260518_182405/figures/credit_trigger_by_regime_diagnostic
+- moved figures/drawdown_2015_2016_forensic_diagnostic -> archive/intermediate_outputs_20260518_182405/figures/drawdown_2015_2016_forensic_diagnostic
+- moved figures/flat_risk_gold_cash_diagnostic -> archive/intermediate_outputs_20260518_182405/figures/flat_risk_gold_cash_diagnostic
+- moved figures/flat_vix_credit_trigger_diagnostic -> archive/intermediate_outputs_20260518_182405/figures/flat_vix_credit_trigger_diagnostic
+- moved figures/hedge_asset_cross_state_diagnostic -> archive/intermediate_outputs_20260518_182405/figures/hedge_asset_cross_state_diagnostic
+- moved figures/hedge_asset_cross_state_diagnostic_extended -> archive/intermediate_outputs_20260518_182405/figures/hedge_asset_cross_state_diagnostic_extended
+- moved figures/high_frequency_regime_diagnostics -> archive/intermediate_outputs_20260518_182405/figures/high_frequency_regime_diagnostics
+- moved figures/invvol_window_grid_search -> archive/intermediate_outputs_20260518_182405/figures/invvol_window_grid_search
+- moved figures/mature_regime_hedge_final -> archive/intermediate_outputs_20260518_182405/figures/mature_regime_hedge_final
+- moved figures/mature_steep_cmdty_overlay_50spy50ief -> archive/intermediate_outputs_20260518_182405/figures/mature_steep_cmdty_overlay_50spy50ief
+- moved figures/missed_drawdown_episode_diagnostic -> archive/intermediate_outputs_20260518_182405/figures/missed_drawdown_episode_diagnostic
+- moved figures/reconstructed_regime_asset_behavior -> archive/intermediate_outputs_20260518_182405/figures/reconstructed_regime_asset_behavior
+- moved figures/regime -> archive/intermediate_outputs_20260518_182405/figures/regime
+- moved figures/regime_aware_risk_parity_allocation -> archive/intermediate_outputs_20260518_182405/figures/regime_aware_risk_parity_allocation
+- moved figures/regime_labeled_sell_lag_diagnostic -> archive/intermediate_outputs_20260518_182405/figures/regime_labeled_sell_lag_diagnostic
+- moved figures/rule_based_allocation -> archive/intermediate_outputs_20260518_182405/figures/rule_based_allocation
+- moved figures/rule_based_backtest -> archive/intermediate_outputs_20260518_182405/figures/rule_based_backtest
+- moved figures/rule_diagnostics -> archive/intermediate_outputs_20260518_182405/figures/rule_diagnostics
+- moved figures/spy_cash_backbone_upgrade_ablation -> archive/intermediate_outputs_20260518_182405/figures/spy_cash_backbone_upgrade_ablation
+- moved figures/stress_recovery_grid_search -> archive/intermediate_outputs_20260518_182405/figures/stress_recovery_grid_search
+- moved stale results/main_pipeline_final/tables\recovery_episode_summary.csv -> archive/intermediate_outputs_20260518_182405/stale_main_pipeline_files/
+- moved stale results/main_pipeline_final/tables\false_recovery_by_regime.csv -> archive/intermediate_outputs_20260518_182405/stale_main_pipeline_files/
+- moved stale results/main_pipeline_final/tables\recovery_profitable_losing_by_regime.csv -> archive/intermediate_outputs_20260518_182405/stale_main_pipeline_files/
+- moved stale results/main_pipeline_final/tables\inverse_vol_recovery_diagnostics.csv -> archive/intermediate_outputs_20260518_182405/stale_main_pipeline_files/
+- moved stale results/main_pipeline_final/figures\false_recovery_rate_by_regime.png -> archive/intermediate_outputs_20260518_182405/stale_main_pipeline_files/
+- moved stale results/main_pipeline_final/figures\profitable_exit_rate_by_regime.png -> archive/intermediate_outputs_20260518_182405/stale_main_pipeline_files/
+- moved stale results/main_pipeline_final/figures\inverse_vol_vs_equal_weight_recovery.png -> archive/intermediate_outputs_20260518_182405/stale_main_pipeline_files/
+- moved scripts\__pycache__ -> archive/intermediate_outputs_20260518_182405/
+- moved src\allocation\__pycache__ -> archive/intermediate_outputs_20260518_182405/
+- moved src\analysis\__pycache__ -> archive/intermediate_outputs_20260518_182405/
+- moved src\diagnostics\__pycache__ -> archive/intermediate_outputs_20260518_182405/
+- moved src\regime\__pycache__ -> archive/intermediate_outputs_20260518_182405/
+- moved src\strategies\__pycache__ -> archive/intermediate_outputs_20260518_182405/
+- moved src\timing\__pycache__ -> archive/intermediate_outputs_20260518_182405/

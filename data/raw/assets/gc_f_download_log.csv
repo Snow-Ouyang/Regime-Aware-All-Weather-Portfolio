@@ -1,0 +1,2 @@
+ticker,download_status,error_message,first_valid_date,last_valid_date,daily_obs
+GC=F,success,,2000-08-30,2026-05-13,6449

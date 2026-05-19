@@ -1,0 +1,42 @@
+project:
+  name: regime_aware_stress_timing_and_hedge_allocation
+  final_strategy: MATURE_REGIME_HEDGE_FINAL
+  trading_days_per_year: 252
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  final_panel: results/09_final_strategy/mature_regime_hedge_final/daily_backtest_panel.csv
+
+strategy:
+  regime_universe:
+    - FLAT
+    - STEEP
+    - INVERTED
+  inverse_vol_window: 120
+  one_way_cost_bps: 5
+  recovery_rule: SPY_CROSS_ABOVE_MA20
+  flat_non_risk_pool:
+    - SPY
+    - GOLD
+    - CMDTY_FUT
+  flat_risk:
+    GOLD: 0.50
+    CASH: 0.50
+  steep_non_risk:
+    SPY: 1.00
+  steep_slow_growth_overlay:
+    trigger: CMDTY_RET60 < -0.10
+    SPY: 0.50
+    IEF: 0.50
+  steep_risk:
+    IEF: 1.00
+  inverted_pool:
+    - SPY
+    - GOLD
+
+outputs:
+  final_results_dir: results/09_final_strategy/mature_regime_hedge_final
+  final_figures_dir: figures/09_final_strategy/mature_regime_hedge_final
+  final_report: reports/FINAL_REPORT.md
+  output_index: reports/OUTPUT_INDEX.md
