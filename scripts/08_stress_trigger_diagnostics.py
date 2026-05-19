@@ -654,7 +654,7 @@ def plot_long_trigger_timeline(panel: pd.DataFrame) -> None:
         ("CREDIT_FULL_RISK_TRIGGER", "Credit15+DD", "s", "#d7301f"),
         ("CMDTY_FULL_RISK_TRIGGER", "Cmdty Lock", "D", "#2b8cbe"),
     ]
-    fig, ax = plt.subplots(figsize=(34, 8))
+    fig, ax = plt.subplots(figsize=(22, 7))
     dates = panel["date"]
     prices = panel["spy_price"]
 
@@ -679,24 +679,24 @@ def plot_long_trigger_timeline(panel: pd.DataFrame) -> None:
         if not sub.empty:
             ax.scatter(sub["date"], sub["spy_price"], marker=marker, s=34, color=color, edgecolor="white", linewidth=0.5, label=label, zorder=4)
 
-    above_ma20 = (panel["spy_price"] > panel["SPY_MA20"]).fillna(False)
-    # Mark only the first confirmed recovery day in an above-MA20 run:
-    # day 1 crosses/gets above, day 2 stays above, day 3 stays above -> one R3 mark on day 3.
-    r3_2d_confirm = (
-        above_ma20
-        & above_ma20.shift(1, fill_value=False)
-        & above_ma20.shift(2, fill_value=False)
-        & ~above_ma20.shift(3, fill_value=False)
+    unlock_mask = (
+        panel.get("trigger_lock_locks_unlocked_today", pd.Series(index=panel.index, dtype=object))
+        .fillna("")
+        .astype(str)
+        .ne("")
+        & panel.get("trigger_lock_locks_unlocked_today", pd.Series(index=panel.index, dtype=object))
+        .fillna("")
+        .astype(str)
+        .ne("NONE")
     )
-    r3_idx = panel.index[r3_2d_confirm]
-    for idx in r3_idx:
-        x = dates.iloc[idx]
+    unlock_dates = panel.loc[unlock_mask, "date"]
+    for x in unlock_dates:
         ax.axvline(
             x=x,
             color="#4d4d4d",
             linestyle="dashed",
-            linewidth=0.8,
-            alpha=0.55,
+            linewidth=0.9,
+            alpha=0.65,
             zorder=1,
         )
 
@@ -706,10 +706,10 @@ def plot_long_trigger_timeline(panel: pd.DataFrame) -> None:
     ax.add_artist(leg1)
     trigger_legend = ax.legend(loc="upper right", title="Trigger Events", framealpha=0.95)
     ax.add_artist(trigger_legend)
-    r3_handle = plt.Line2D([0], [0], color="#4d4d4d", linestyle="dashed", linewidth=1.0)
-    ax.legend([r3_handle], ["R3 2D Confirm"], loc="lower left", framealpha=0.95)
+    unlock_handle = plt.Line2D([0], [0], color="#4d4d4d", linestyle="dashed", linewidth=1.0)
+    ax.legend([unlock_handle], ["Trigger unlock"], loc="lower left", framealpha=0.95)
 
-    ax.set_title("SPY Price with Refined Regime Backgrounds, Trigger Events, and R3 2D Confirmation Marks")
+    ax.set_title("SPY Price with Refined Regime Backgrounds, Trigger Events, and Trigger Unlock Marks")
     ax.set_xlabel("")
     ax.set_ylabel("SPY price")
     ax.set_yscale("log")
