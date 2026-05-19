@@ -1,6 +1,42 @@
 # Regime-Aware Stress Timing and Hedge Allocation Strategy
 
+## Final Result
+
+This project builds a SPY-centered regime-aware index enhancement strategy. By combining regime-conditioned stress timing, trigger-lock exits, and regime-specific hedge allocation, the final strategy improves both return and drawdown control relative to SPY buy-and-hold.
+
+![Final equity curve](results/main_pipeline_final/figures/final_equity_curve_comparison.png)
+
+| Strategy | CAGR | Sharpe | Sortino | MaxDD | Calmar | Final Equity |
+|---|---:|---:|---:|---:|---:|---:|
+| SPY_BUY_HOLD | 11.14% | 0.575 | 0.702 | -55.19% | 0.202 | 8.38 |
+| SPY_CASH_TIMING | 12.04% | 0.948 | 1.101 | -29.45% | 0.409 | 9.86 |
+| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 19.63% | 1.460 | 1.959 | -18.28% | 1.074 | 36.91 |
+
+Compared with SPY buy-and-hold, the final strategy improves CAGR from 11.14% to 19.63%, raises Sharpe from 0.575 to 1.460, and reduces MaxDD from -55.19% to -18.28%. The improvement is not driven by one universal signal. It comes from combining regime-specific stress triggers, trigger-lock stress periods, and regime-specific hedge allocation.
+
+![Final drawdown curve](results/main_pipeline_final/figures/final_drawdown_curve_comparison.png)
+
+## Core Insight
+
 **Stress triggers are regime-dependent, and hedge assets are also regime-dependent.**
+
+VIX, credit, and commodity stress do not have the same meaning in every regime. GOLD, IEF, CASH, commodities, and SPY do not have fixed roles across regimes. The final framework therefore conditions both stress detection and hedge allocation on the macro regime. This is why the project is not a traditional all-weather portfolio or a generic timing model.
+
+## Framework
+
+```text
+ML regime discovery
+        ->
+Rule-based macro regimes
+        ->
+Regime-specific trigger-lock stress detection
+        ->
+Regime x stress asset behavior
+        ->
+Regime-specific hedge allocation
+        ->
+Final SPY-centered index enhancement strategy
+```
 
 This project is not a traditional all-weather portfolio and not a generic market-timing system. It is a **SPY-centered regime-aware index enhancement strategy**. The goal is to preserve SPY as the long-term return engine while using regime-conditioned stress triggers and regime-specific hedge allocation to reduce major bear-market and stress-period drawdowns.
 
@@ -142,7 +178,7 @@ Key findings:
 | `STEEP` | Full risk | VIX or commodity lock active | 30% GOLD / 70% IEF | IEF handles duration-sensitive stress; GOLD diversifies commodity / inflation shocks |
 | `INVERTED` | Normal only | No full-risk trigger enabled | SPY / GOLD inverse-vol | Inversion is not treated as an automatic cash/risk-off command |
 
-## Results
+## Full Backtest Results
 
 | Strategy | CAGR | Sharpe | Sortino | MaxDD | Calmar | Final Equity |
 |---|---:|---:|---:|---:|---:|---:|
