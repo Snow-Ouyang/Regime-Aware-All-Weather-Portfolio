@@ -141,7 +141,7 @@ def add_trigger_flags(panel: pd.DataFrame) -> pd.DataFrame:
 def trigger_frequency_by_regime(panel: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for regime, sub in panel.groupby("final_regime", dropna=False):
-        row = {"refined_regime": regime, "total_days": len(sub)}
+        row = {"final_regime": regime, "total_days": len(sub)}
         for col in [
             "VIX_FULL_RISK_TRIGGER",
             "RAW_CREDIT_DRAWDOWN_TRIGGER",
@@ -190,7 +190,7 @@ def multi_trigger_by_regime(panel: pd.DataFrame) -> pd.DataFrame:
         combos = sub[FULL_RISK_TRIGGERS].apply(lambda r: "+".join([c.replace("_FULL_RISK_TRIGGER", "").replace("EFFECTIVE_", "") for c, v in r.items() if v]) or "NONE", axis=1)
         common = combos.value_counts()
         row = {
-            "refined_regime": regime,
+            "final_regime": regime,
             "total_days": len(sub),
             "days_with_0_full_risk_trigger": int((count == 0).sum()),
             "days_with_1_full_risk_trigger": int((count == 1).sum()),
@@ -254,7 +254,7 @@ def build_entry_attribution(panel: pd.DataFrame) -> pd.DataFrame:
             {
                 "entry_id": n,
                 "entry_date": panel.loc[entry, "date"],
-                "refined_regime_at_entry": panel.loc[entry, "refined_regime"],
+                "final_regime_at_entry": panel.loc[entry, "final_regime"],
                 "allocation_state_at_entry": panel.loc[entry, "allocation_state"],
                 "base_regime_at_entry": panel.loc[entry, "base_regime"],
                 "trigger_vix": cause_vix,
@@ -265,7 +265,7 @@ def build_entry_attribution(panel: pd.DataFrame) -> pd.DataFrame:
                 "raw_credit_drawdown_trigger": bool(sig["RAW_CREDIT_DRAWDOWN_TRIGGER"]),
                 "effective_credit_drawdown_trigger": bool(sig["EFFECTIVE_CREDIT_DRAWDOWN_TRIGGER"]),
                 "slow_growth_overlay_trigger_at_entry": bool(sig["STEEP_SLOW_GROWTH_OVERLAY_TRIGGER"]),
-                "previous_refined_regime": panel.loc[entry - 1, "refined_regime"] if entry > 0 else None,
+                "previous_final_regime": panel.loc[entry - 1, "final_regime"] if entry > 0 else None,
                 "previous_allocation_state": panel.loc[entry - 1, "allocation_state"] if entry > 0 else None,
                 "previous_full_risk_active": bool(panel.loc[entry - 1, "FULL_RISK_ACTIVE"]) if entry > 0 else False,
                 "previous_recovery_active": bool(panel.loc[entry - 1, "RECOVERY_ACTIVE"]) if entry > 0 else False,
@@ -298,7 +298,7 @@ def build_exit_reentry(panel: pd.DataFrame, entries_df: pd.DataFrame) -> pd.Data
             {
                 "exit_id": n,
                 "exit_date": panel.loc[exit_idx, "date"],
-                "refined_regime_at_exit": panel.loc[exit_idx, "refined_regime"],
+                "final_regime_at_exit": panel.loc[exit_idx, "final_regime"],
                 "allocation_state_at_exit": panel.loc[exit_idx, "allocation_state"],
                 "base_regime_at_exit": panel.loc[exit_idx, "base_regime"],
                 "exit_reason": "TRIGGER_LOCKS_UNLOCKED",
@@ -309,7 +309,7 @@ def build_exit_reentry(panel: pd.DataFrame, entries_df: pd.DataFrame) -> pd.Data
                 "reentered_within_10d": bool(next_entry is not None and next_entry - exit_idx <= 10),
                 "reentered_within_20d": bool(next_entry is not None and next_entry - exit_idx <= 20),
                 "next_entry_date": next_entry_date,
-                "next_entry_refined_regime": panel.loc[next_entry, "refined_regime"] if next_entry is not None else None,
+                "next_entry_final_regime": panel.loc[next_entry, "final_regime"] if next_entry is not None else None,
                 "next_entry_allocation_state": panel.loc[next_entry, "allocation_state"] if next_entry is not None else None,
                 "next_entry_trigger_combination": combo,
                 "recovery_active_after_exit": bool(panel.loc[exit_idx, "RECOVERY_ACTIVE"]),
@@ -331,11 +331,11 @@ def stress_reentry_by_regime(exit_df: pd.DataFrame) -> pd.DataFrame:
     if exit_df.empty:
         return pd.DataFrame()
     rows = []
-    for regime, sub in exit_df.groupby("refined_regime_at_exit", dropna=False):
+    for regime, sub in exit_df.groupby("final_regime_at_exit", dropna=False):
         common = sub["next_entry_trigger_combination"].dropna().value_counts()
         rows.append(
             {
-                "refined_regime_at_exit": regime,
+                "final_regime_at_exit": regime,
                 "exit_count": len(sub),
                 "reentry_5d_count": int(sub["reentered_within_5d"].sum()),
                 "reentry_5d_rate": float(sub["reentered_within_5d"].mean()),
@@ -466,7 +466,7 @@ def trigger_effectiveness(entries: pd.DataFrame) -> pd.DataFrame:
     if entries.empty:
         return pd.DataFrame()
     out = (
-        entries.groupby(["refined_regime_at_entry", "trigger_combination"], dropna=False)
+        entries.groupby(["final_regime_at_entry", "trigger_combination"], dropna=False)
         .agg(
             entry_count=("entry_id", "size"),
             avg_stress_duration_days=("stress_duration_days", "mean"),
@@ -522,11 +522,11 @@ def top_turnover_dates(panel: pd.DataFrame) -> pd.DataFrame:
 
 def diagnostics_summary(panel: pd.DataFrame, freq: pd.DataFrame, multi: pd.DataFrame, entries: pd.DataFrame, exits: pd.DataFrame, turnover_event: pd.DataFrame, alloc_trans: pd.DataFrame, steep_trans: pd.DataFrame, effectiveness: pd.DataFrame) -> pd.DataFrame:
     top_trigger = entries["trigger_combination"].value_counts().index[0] if not entries.empty else "NONE"
-    top_trigger_regime = entries.groupby("refined_regime_at_entry").size().sort_values(ascending=False).index[0] if not entries.empty else "NONE"
-    highest_trigger_regime = freq.sort_values("FULL_RISK_TRIGGER_ANY_rate", ascending=False)["refined_regime"].iloc[0] if not freq.empty else "NONE"
-    highest_multi_regime = multi.sort_values("multi_full_risk_trigger_rate", ascending=False)["refined_regime"].iloc[0] if not multi.empty else "NONE"
+    top_trigger_regime = entries.groupby("final_regime_at_entry").size().sort_values(ascending=False).index[0] if not entries.empty else "NONE"
+    highest_trigger_regime = freq.sort_values("FULL_RISK_TRIGGER_ANY_rate", ascending=False)["final_regime"].iloc[0] if not freq.empty else "NONE"
+    highest_multi_regime = multi.sort_values("multi_full_risk_trigger_rate", ascending=False)["final_regime"].iloc[0] if not multi.empty else "NONE"
     reentry = stress_reentry_by_regime(exits)
-    highest_reentry = reentry.sort_values("reentry_20d_rate", ascending=False)["refined_regime_at_exit"].iloc[0] if not reentry.empty else "NONE"
+    highest_reentry = reentry.sort_values("reentry_20d_rate", ascending=False)["final_regime_at_exit"].iloc[0] if not reentry.empty else "NONE"
     best_dd = effectiveness.sort_values("mean_drawdown_reduction_vs_SPY", ascending=False).head(1)
     worst_reentry = effectiveness.sort_values("reentry_rate_20d_after_exit", ascending=False).head(1)
     notes = [
@@ -551,8 +551,8 @@ def diagnostics_summary(panel: pd.DataFrame, freq: pd.DataFrame, multi: pd.DataF
                 "top_turnover_event_reason": turnover_event.iloc[0]["event_reason"] if not turnover_event.empty else "NONE",
                 "top_turnover_allocation_transition": f"{alloc_trans.iloc[0]['from_allocation_state']} -> {alloc_trans.iloc[0]['to_allocation_state']}" if not alloc_trans.empty else "NONE",
                 "top_steep_internal_transition": f"{steep_trans.iloc[0]['from_allocation_state']} -> {steep_trans.iloc[0]['to_allocation_state']}" if not steep_trans.empty else "NONE",
-                "trigger_with_best_drawdown_reduction": f"{best_dd.iloc[0]['refined_regime_at_entry']}:{best_dd.iloc[0]['trigger_combination']}" if not best_dd.empty else "NONE",
-                "trigger_with_worst_reentry_rate": f"{worst_reentry.iloc[0]['refined_regime_at_entry']}:{worst_reentry.iloc[0]['trigger_combination']}" if not worst_reentry.empty else "NONE",
+                "trigger_with_best_drawdown_reduction": f"{best_dd.iloc[0]['final_regime_at_entry']}:{best_dd.iloc[0]['trigger_combination']}" if not best_dd.empty else "NONE",
+                "trigger_with_worst_reentry_rate": f"{worst_reentry.iloc[0]['final_regime_at_entry']}:{worst_reentry.iloc[0]['trigger_combination']}" if not worst_reentry.empty else "NONE",
                 "notes": " ".join(notes),
             }
         ]
@@ -562,7 +562,7 @@ def diagnostics_summary(panel: pd.DataFrame, freq: pd.DataFrame, multi: pd.DataF
 def plot_outputs(freq: pd.DataFrame, overlap: pd.DataFrame, multi: pd.DataFrame, entries: pd.DataFrame, exits_by_regime: pd.DataFrame, steep_trans: pd.DataFrame, turnover_event: pd.DataFrame, alloc_trans: pd.DataFrame, effectiveness: pd.DataFrame) -> None:
     fig, ax = plt.subplots(figsize=(12, 5))
     cols = ["FULL_RISK_TRIGGER_ANY_rate", "FULL_RISK_ACTIVE_rate", "SLOW_GROWTH_OVERLAY_ACTIVE_rate", "RECOVERY_ACTIVE_rate"]
-    freq.set_index("refined_regime")[cols].plot(kind="bar", ax=ax)
+    freq.set_index("final_regime")[cols].plot(kind="bar", ax=ax)
     ax.set_title("Trigger Frequency by Regime")
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
     fig.tight_layout()
@@ -578,7 +578,7 @@ def plot_outputs(freq: pd.DataFrame, overlap: pd.DataFrame, multi: pd.DataFrame,
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.bar(multi["refined_regime"], multi["multi_full_risk_trigger_rate"])
+    ax.bar(multi["final_regime"], multi["multi_full_risk_trigger_rate"])
     ax.set_title("Multi Full-Risk Trigger Rate by Regime")
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
     fig.tight_layout()
@@ -597,7 +597,7 @@ def plot_outputs(freq: pd.DataFrame, overlap: pd.DataFrame, multi: pd.DataFrame,
 
     fig, ax = plt.subplots(figsize=(8, 4))
     if not exits_by_regime.empty:
-        ax.bar(exits_by_regime["refined_regime_at_exit"], exits_by_regime["reentry_20d_rate"])
+        ax.bar(exits_by_regime["final_regime_at_exit"], exits_by_regime["reentry_20d_rate"])
     ax.set_title("20D Full-Risk Re-entry Rate by Exit Regime")
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
     fig.tight_layout()
@@ -640,7 +640,7 @@ def plot_outputs(freq: pd.DataFrame, overlap: pd.DataFrame, multi: pd.DataFrame,
     fig, ax = plt.subplots(figsize=(10, 5))
     if not effectiveness.empty:
         d = effectiveness.copy()
-        labels = d["refined_regime_at_entry"].astype(str) + ":" + d["trigger_combination"].astype(str)
+        labels = d["final_regime_at_entry"].astype(str) + ":" + d["trigger_combination"].astype(str)
         ax.bar(labels, d["mean_drawdown_reduction_vs_SPY"])
         ax.tick_params(axis="x", labelrotation=55)
     ax.set_title("Trigger Effectiveness by Regime: Drawdown Reduction vs SPY")
@@ -770,6 +770,7 @@ def main() -> None:
         "date",
         "base_regime",
         "refined_regime",
+        "final_regime",
         "allocation_state",
         "VIX_FULL_RISK_TRIGGER",
         "RAW_CREDIT_DRAWDOWN_TRIGGER",
@@ -826,7 +827,7 @@ def main() -> None:
     update_readme(summary)
 
     print("Trigger frequency by regime:")
-    print(freq[["refined_regime", "total_days", "FULL_RISK_TRIGGER_ANY_rate", "FULL_RISK_ACTIVE_rate"]].to_string(index=False))
+    print(freq[["final_regime", "total_days", "FULL_RISK_TRIGGER_ANY_rate", "FULL_RISK_ACTIVE_rate"]].to_string(index=False))
     print("Total FULL_RISK entries / exits:", len(entries), "/", len(exits))
     print("Top 5 turnover event reasons:")
     print(turnover_event.head(5)[["event_reason", "total_turnover", "share_of_total_turnover"]].to_string(index=False))
@@ -837,7 +838,7 @@ def main() -> None:
         top = steep_trans.iloc[0]
         print(f"{top['from_allocation_state']} -> {top['to_allocation_state']} turnover={top['total_turnover']:.4f}")
     highest = exits_by_regime.sort_values("reentry_20d_rate", ascending=False).head(1)
-    print("Highest re-entry regime:", highest["refined_regime_at_exit"].iloc[0] if not highest.empty else "NONE")
+    print("Highest re-entry regime:", highest["final_regime_at_exit"].iloc[0] if not highest.empty else "NONE")
     print("Output path:", OUT)
 
 

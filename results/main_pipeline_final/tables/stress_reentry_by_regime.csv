@@ -1,5 +1,6 @@
-refined_regime_at_exit,exit_count,reentry_5d_count,reentry_5d_rate,reentry_10d_count,reentry_10d_rate,reentry_20d_count,reentry_20d_rate,mean_days_until_next_entry,most_common_next_entry_trigger,mean_strategy_return_next_20d,mean_SPY_return_next_20d
+final_regime_at_exit,exit_count,reentry_5d_count,reentry_5d_rate,reentry_10d_count,reentry_10d_rate,reentry_20d_count,reentry_20d_rate,mean_days_until_next_entry,most_common_next_entry_trigger,mean_strategy_return_next_20d,mean_SPY_return_next_20d
 FLAT_HIGH_RATE,7,0,0.0,1,0.14285714285714285,2,0.2857142857142857,99.5,VIX,0.011773904566377582,0.011058065867250983
 FLAT_LOW_RATE,9,1,0.1111111111111111,1,0.1111111111111111,3,0.3333333333333333,84.33333333333333,VIX,0.04520308320541222,0.01836436146837776
 INVERTED,2,0,0.0,0,0.0,0,0.0,388.5,VIX,-0.017017210007981898,-0.014433337655024636
-STEEP,17,0,0.0,0,0.0,3,0.17647058823529413,108.29411764705883,CMDTY,0.011898118217548107,0.015258070883785313
+STEEP_HIGH_RATE,5,0,0.0,0,0.0,2,0.4,151.4,CMDTY,0.022701088323604825,0.02523047521784334
+STEEP_LOW_RATE,12,0,0.0,0,0.0,1,0.08333333333333333,90.33333333333333,VIX,0.0073968806733578085,0.011102902411261134

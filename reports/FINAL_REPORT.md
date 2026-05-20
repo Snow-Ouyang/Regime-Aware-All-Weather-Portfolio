@@ -125,14 +125,16 @@ Forward 20-day return is useful, but it is incomplete for a lock-based strategy.
 | `FLAT_HIGH_RATE` | VIX | 7 | 12.6d | -0.02% | 1.24% | -3.55% | 2.54% |
 | `FLAT_LOW_RATE` | CREDIT | 5 | 26.4d | 3.05% | 2.44% | -5.58% | 2.31% |
 | `FLAT_LOW_RATE` | VIX | 4 | 16.0d | 0.94% | -2.92% | -10.32% | 6.18% |
-| `STEEP` | CMDTY | 8 | 66.8d | 4.68% | -3.15% | -13.52% | 10.23% |
-| `STEEP` | VIX | 9 | 8.8d | -0.61% | 2.08% | -2.13% | 1.00% |
+| `STEEP_HIGH_RATE` | CMDTY | 4 | 71.2d | 5.83% | -10.12% | -18.28% | 15.09% |
+| `STEEP_HIGH_RATE` | VIX | 3 | 12.0d | 0.00% | 0.80% | -3.65% | 2.28% |
+| `STEEP_LOW_RATE` | CMDTY | 4 | 62.2d | 3.54% | 3.82% | -8.75% | 5.37% |
+| `STEEP_LOW_RATE` | VIX | 6 | 7.2d | -0.91% | 2.71% | -1.37% | 0.35% |
 
 Interpretation:
 
 - VIX lock mainly catches fast crash conditions; not every VIX spike is a profitable hedge episode.
 - Credit lock is strongest in `FLAT_HIGH_RATE`, where price-confirmed credit stress tends to be more damaging.
-- Commodity lock is the key fix for `STEEP` slow-growth stress, particularly the 2015-2016 commodity / growth scare.
+- Commodity lock is the key fix for STEEP slow-growth stress, with clearly stronger drawdown-reduction evidence in `STEEP_HIGH_RATE` than in `STEEP_LOW_RATE`.
 - The same trigger can be effective in one regime and noisy in another.
 
 Core files:
