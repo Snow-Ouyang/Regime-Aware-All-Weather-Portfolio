@@ -46,7 +46,8 @@ def allocation_state(row: pd.Series) -> str:
         "FLAT_LOW_RATE_STRESS",
         "FLAT_HIGH_RATE_NORMAL",
         "FLAT_HIGH_RATE_STRESS",
-        "STEEP_NON_RISK",
+        "STEEP_LOW_RATE_NORMAL",
+        "STEEP_HIGH_RATE_NORMAL",
         "STEEP_FULL_RISK",
         "INVERTED",
     }
@@ -99,6 +100,12 @@ def add_trigger_flags(panel: pd.DataFrame) -> pd.DataFrame:
         out["refined_regime_confirmed"].isin(["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP", "INVERTED"]),
         "OTHER",
     )
+    out["final_regime"] = out.get("final_regime_confirmed", out["refined_regime"]).where(
+        out.get("final_regime_confirmed", out["refined_regime"]).isin(
+            ["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_HIGH_RATE", "INVERTED"]
+        ),
+        "OTHER",
+    )
     out["allocation_state"] = out.apply(allocation_state, axis=1)
     out["VIX_FULL_RISK_TRIGGER"] = out["refined_regime"].isin(["STEEP", "FLAT_LOW_RATE", "FLAT_HIGH_RATE"]) & (
         out["VIX_ZSCORE_120D"] >= 3.0
@@ -133,7 +140,7 @@ def add_trigger_flags(panel: pd.DataFrame) -> pd.DataFrame:
 
 def trigger_frequency_by_regime(panel: pd.DataFrame) -> pd.DataFrame:
     rows = []
-    for regime, sub in panel.groupby("refined_regime", dropna=False):
+    for regime, sub in panel.groupby("final_regime", dropna=False):
         row = {"refined_regime": regime, "total_days": len(sub)}
         for col in [
             "VIX_FULL_RISK_TRIGGER",
@@ -178,7 +185,7 @@ def trigger_overlap_matrix(panel: pd.DataFrame) -> pd.DataFrame:
 
 def multi_trigger_by_regime(panel: pd.DataFrame) -> pd.DataFrame:
     rows = []
-    for regime, sub in panel.groupby("refined_regime", dropna=False):
+    for regime, sub in panel.groupby("final_regime", dropna=False):
         count = sub[FULL_RISK_TRIGGERS].sum(axis=1)
         combos = sub[FULL_RISK_TRIGGERS].apply(lambda r: "+".join([c.replace("_FULL_RISK_TRIGGER", "").replace("EFFECTIVE_", "") for c, v in r.items() if v]) or "NONE", axis=1)
         common = combos.value_counts()
@@ -369,7 +376,7 @@ def event_reason(row: pd.Series) -> str:
 def add_event_reasons(panel: pd.DataFrame) -> pd.DataFrame:
     out = panel.copy()
     out["previous_allocation_state"] = out["allocation_state"].shift(1)
-    out["previous_refined_regime"] = out["refined_regime"].shift(1)
+    out["previous_refined_regime"] = out["final_regime"].shift(1)
     out["is_full_risk_entry"] = out["FULL_RISK_ACTIVE"] & ~out["FULL_RISK_ACTIVE"].shift(1, fill_value=False)
     out["is_full_risk_exit"] = ~out["FULL_RISK_ACTIVE"] & out["FULL_RISK_ACTIVE"].shift(1, fill_value=False)
     out["is_recovery_entry"] = out["RECOVERY_ACTIVE"] & ~out["RECOVERY_ACTIVE"].shift(1, fill_value=False)
@@ -378,8 +385,8 @@ def add_event_reasons(panel: pd.DataFrame) -> pd.DataFrame:
     out["is_steep_overlay_exit"] = ~out["SLOW_GROWTH_OVERLAY_ACTIVE"] & out["SLOW_GROWTH_OVERLAY_ACTIVE"].shift(1, fill_value=False)
     out["is_flat_low_high_switch"] = (
         out["previous_refined_regime"].isin(["FLAT_LOW_RATE", "FLAT_HIGH_RATE"])
-        & out["refined_regime"].isin(["FLAT_LOW_RATE", "FLAT_HIGH_RATE"])
-        & out["previous_refined_regime"].ne(out["refined_regime"])
+        & out["final_regime"].isin(["FLAT_LOW_RATE", "FLAT_HIGH_RATE"])
+        & out["previous_refined_regime"].ne(out["final_regime"])
     )
     combos = []
     for i in out.index:
@@ -493,7 +500,7 @@ def top_turnover_dates(panel: pd.DataFrame) -> pd.DataFrame:
                 "turnover": row["turnover"],
                 "event_reason": row["event_reason"],
                 "previous_refined_regime": row["previous_refined_regime"],
-                "current_refined_regime": row["refined_regime"],
+                "current_refined_regime": row["final_regime"],
                 "previous_allocation_state": row["previous_allocation_state"],
                 "current_allocation_state": row["allocation_state"],
                 "previous_weights_string": weight_string(prev),
@@ -646,7 +653,8 @@ def plot_long_trigger_timeline(panel: pd.DataFrame) -> None:
     regime_colors = {
         "FLAT_LOW_RATE": "#8bc34a",
         "FLAT_HIGH_RATE": "#f4b400",
-        "STEEP": "#4fc3f7",
+        "STEEP_LOW_RATE": "#4fc3f7",
+        "STEEP_HIGH_RATE": "#1976d2",
         "INVERTED": "#ff8a65",
     }
     trigger_specs = [
@@ -659,7 +667,7 @@ def plot_long_trigger_timeline(panel: pd.DataFrame) -> None:
     prices = panel["spy_price"]
 
     start = 0
-    regimes = panel["refined_regime"].fillna("OTHER").astype(str).tolist()
+    regimes = panel["final_regime"].fillna("OTHER").astype(str).tolist()
     for i in range(1, len(panel) + 1):
         if i == len(panel) or regimes[i] != regimes[start]:
             ax.axvspan(

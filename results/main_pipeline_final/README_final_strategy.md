@@ -13,11 +13,14 @@ Key design choices:
 - Credit spread is raw `WBAA - WAAA`, forward-filled to trading days.
 - Macro regime has no `NEUTRAL`: term spread maps every day to `INVERTED`,
   `FLAT`, or `STEEP`, then uses 3-day confirmation.
-- FLAT is refined with GS10 threshold 2.9 into `FLAT_LOW_RATE` and
+- FLAT is refined with GS10 threshold 3.0 into `FLAT_LOW_RATE` and
   `FLAT_HIGH_RATE`.
+- STEEP normal is refined with GS1 threshold 0.3 into `STEEP_LOW_RATE`
+  and `STEEP_HIGH_RATE`; the low/high switch also uses 3-day confirmation.
 - `CASH_return` uses geometric daily DTB3.
 - `CMDTY_RET60` uses synthetic commodity price from `CMDTY_FUT_return`.
 - `VIX_ZSCORE_120D` uses 120 trading days, current-day inclusive, `ddof=1`.
+- Inverse-vol window grid search showed limited sensitivity across reasonable settings; the final mainline uses 90 trading days.
 - Transaction cost uses 10 bps one-way.
 - Recovery overlay exploration is not part of the final mainline.
 
@@ -26,7 +29,8 @@ Final allocation settings:
 - `FLAT_LOW_RATE_STRESS`: 100% GOLD.
 - `FLAT_HIGH_RATE_NORMAL`: GOLD / CMDTY_FUT inverse-vol.
 - `FLAT_HIGH_RATE_STRESS`: 90% IEF / 10% CASH.
-- `STEEP_NON_RISK`: 100% SPY.
+- `STEEP_LOW_RATE_NORMAL`: 100% SPY.
+- `STEEP_HIGH_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
 - `STEEP_FULL_RISK`: 30% GOLD / 70% IEF.
 - `INVERTED`: SPY / GOLD inverse-vol.
 

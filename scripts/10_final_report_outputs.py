@@ -270,13 +270,21 @@ def main() -> None:
     ensure_dirs()
     panel, perf = build_final_source_only_panel()
     stress_flag = panel["final_state"].eq("FULL_RISK")
-    panel["refined_cross_state"] = panel["refined_regime_confirmed"] + "_" + stress_flag.map({True: "STRESS", False: "NORMAL"})
+    panel["allocation_cross_state"] = panel["final_allocation_state"].replace(
+        {
+            "STEEP_FULL_RISK": "STEEP_STRESS",
+            "INVERTED": "INVERTED_NORMAL",
+        }
+    )
+    panel["final_regime_cross_state"] = panel["final_regime_confirmed"] + "_" + stress_flag.map(
+        {True: "STRESS", False: "NORMAL"}
+    )
     panel.to_csv(OUT / "daily_backtest_panel.csv", index=False)
     panel.to_csv(TABLE_DIR / "daily_backtest_panel.csv", index=False)
     display_perf = perf.loc[perf["strategy"].isin(DISPLAY_STRATEGIES)].copy()
     display_perf.to_csv(TABLE_DIR / "strategy_performance_comparison.csv", index=False)
-    cross_behavior = asset_behavior(panel, "refined_cross_state")
-    flat_behavior = asset_behavior(panel, "refined_regime_confirmed")
+    cross_behavior = asset_behavior(panel, "allocation_cross_state")
+    flat_behavior = asset_behavior(panel, "final_regime_confirmed")
     cross_behavior.to_csv(TABLE_DIR / "cross_state_asset_behavior.csv", index=False)
     flat_behavior.to_csv(TABLE_DIR / "flat_low_high_asset_behavior.csv", index=False)
     crisis_performance(panel).to_csv(TABLE_DIR / "crisis_window_performance.csv", index=False)
@@ -292,6 +300,8 @@ def main() -> None:
             "final_state",
             "final_allocation_state",
             "trigger_lock_active_locks",
+            "final_regime_confirmed",
+            "steep_rate_regime_confirmed",
         ]
     ].to_csv(TABLE_DIR / "final_daily_returns.csv", index=False)
     plot_outputs(panel)
@@ -299,30 +309,30 @@ def main() -> None:
     plot_case_studies(panel)
     plot_asset_behavior_heatmap(
         cross_behavior,
-        "refined_cross_state",
+        "allocation_cross_state",
         "cross_state_asset_behavior_heatmap.png",
-        "Asset Annualized Return by Regime x Stress State",
+        "Asset Annualized Return by Final Allocation State",
     )
     plot_asset_behavior_heatmap(
         cross_behavior,
-        "refined_cross_state",
+        "allocation_cross_state",
         "cross_state_asset_sharpe_heatmap.png",
-        "Asset Sharpe Ratio by Regime x Stress State",
+        "Asset Sharpe Ratio by Final Allocation State",
         value_col="Sharpe",
         value_label="Sharpe ratio",
         value_format="number",
     )
     plot_asset_behavior_heatmap(
         flat_behavior,
-        "refined_regime_confirmed",
+        "final_regime_confirmed",
         "flat_low_high_asset_behavior_heatmap.png",
-        "Asset Annualized Return by Refined Regime",
+        "Asset Annualized Return by Final Regime",
     )
     plot_asset_behavior_heatmap(
         flat_behavior,
-        "refined_regime_confirmed",
+        "final_regime_confirmed",
         "flat_low_high_asset_sharpe_heatmap.png",
-        "Asset Sharpe Ratio by Refined Regime",
+        "Asset Sharpe Ratio by Final Regime",
         value_col="Sharpe",
         value_label="Sharpe ratio",
         value_format="number",
@@ -342,11 +352,14 @@ Key design choices:
 - Credit spread is raw `WBAA - WAAA`, forward-filled to trading days.
 - Macro regime has no `NEUTRAL`: term spread maps every day to `INVERTED`,
   `FLAT`, or `STEEP`, then uses 3-day confirmation.
-- FLAT is refined with GS10 threshold 2.9 into `FLAT_LOW_RATE` and
+- FLAT is refined with GS10 threshold 3.0 into `FLAT_LOW_RATE` and
   `FLAT_HIGH_RATE`.
+- STEEP normal is refined with GS1 threshold 0.3 into `STEEP_LOW_RATE`
+  and `STEEP_HIGH_RATE`; the low/high switch also uses 3-day confirmation.
 - `CASH_return` uses geometric daily DTB3.
 - `CMDTY_RET60` uses synthetic commodity price from `CMDTY_FUT_return`.
 - `VIX_ZSCORE_120D` uses 120 trading days, current-day inclusive, `ddof=1`.
+- Inverse-vol window grid search showed limited sensitivity across reasonable settings; the final mainline uses 90 trading days.
 - Transaction cost uses 10 bps one-way.
 - Recovery overlay exploration is not part of the final mainline.
 
@@ -355,7 +368,8 @@ Final allocation settings:
 - `FLAT_LOW_RATE_STRESS`: 100% GOLD.
 - `FLAT_HIGH_RATE_NORMAL`: GOLD / CMDTY_FUT inverse-vol.
 - `FLAT_HIGH_RATE_STRESS`: 90% IEF / 10% CASH.
-- `STEEP_NON_RISK`: 100% SPY.
+- `STEEP_LOW_RATE_NORMAL`: 100% SPY.
+- `STEEP_HIGH_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
 - `STEEP_FULL_RISK`: 30% GOLD / 70% IEF.
 - `INVERTED`: SPY / GOLD inverse-vol.
 

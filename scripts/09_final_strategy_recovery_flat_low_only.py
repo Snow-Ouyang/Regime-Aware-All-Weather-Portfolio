@@ -16,6 +16,8 @@ def main() -> None:
         f"{FINAL}_turnover",
         f"{FINAL}_transaction_cost",
         "final_state",
+        "final_regime_confirmed",
+        "steep_rate_regime_confirmed",
         "final_allocation_state",
         "trigger_lock_active_locks",
         "trigger_lock_entry_signal",

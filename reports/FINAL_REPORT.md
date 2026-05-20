@@ -49,24 +49,26 @@ The final macro regime framework is:
 
 - `FLAT_LOW_RATE`
 - `FLAT_HIGH_RATE`
-- `STEEP`
+- `STEEP_LOW_RATE`
+- `STEEP_HIGH_RATE`
 - `INVERTED`
 
 The first split uses:
 
 `term_spread = GS10 - GS1`
 
-Then raw `FLAT` is split by absolute rate level using `GS10 = 2.9`.
+Then raw `FLAT` is split by absolute rate level using `GS10 = 3.0`. Confirmed `STEEP` regimes are further split by short-rate level using `GS1 = 0.3`.
 
 | Regime | Rule | Threshold Source | Economic Interpretation | Strategy Implication |
 |---|---|---|---|---|
 | `INVERTED` | `term_spread < 0` | Yield-curve inversion | Tight policy, late-cycle inversion, unreliable stress-trigger quality | No full-risk trigger; SPY / GOLD inverse-vol |
 | Raw `FLAT` | `0 <= term_spread <= 1` | Flat curve band | Curve shape is flat but rate level matters | Split by GS10 |
-| `FLAT_LOW_RATE` | raw `FLAT` and `GS10 <= 2.9` | Near FLAT-sample GS10 median | Low-rate flat state; SPY and commodities can still work | Normal pool uses SPY / CMDTY_FUT |
-| `FLAT_HIGH_RATE` | raw `FLAT` and `GS10 > 2.9` | Same median-based split | High-rate flat state; equity exposure is less attractive | Normal pool uses GOLD / CMDTY_FUT |
-| `STEEP` | `term_spread > 1` | Positive curve slope | Recovery, reflation, or policy-easing expectation; can hide commodity-led slow-growth stress | Non-risk 100% SPY; stress hedge GOLD / IEF |
+| `FLAT_LOW_RATE` | raw `FLAT` and `GS10 <= 3.0` | Rounded flat-rate split | Low-rate flat state; SPY and commodities can still work | Normal pool uses SPY / CMDTY_FUT |
+| `FLAT_HIGH_RATE` | raw `FLAT` and `GS10 > 3.0` | Same GS10 split | High-rate flat state; equity exposure is less attractive | Normal pool uses GOLD / CMDTY_FUT |
+| `STEEP_LOW_RATE` | raw `STEEP` and confirmed `GS1 <= 0.3` | Short-rate split from STEEP GS1 diagnostics | Low short-rate steep curve; SPY remains the clean return engine | Normal pool uses 100% SPY |
+| `STEEP_HIGH_RATE` | raw `STEEP` and confirmed `GS1 > 0.3` | Same GS1 split with 3-day confirmation | Higher short-rate steep curve; commodities diversify equity exposure | Normal pool uses SPY / CMDTY_FUT inverse-vol |
 
-The 2.9 GS10 threshold is not presented as an optimized parameter. It is a structural split near the FLAT-sample median. It is used because asset behavior differs materially between low-rate and high-rate flat regimes.
+The `GS10 = 3.0` threshold is the rounded version of the flat-rate diagnostic threshold. The `GS1 = 0.3` threshold is used inside confirmed `STEEP` regimes because GS1 better captures short-rate policy level, cash yield, and financing pressure than GS10. The main new finding is that commodities behave differently in `STEEP_LOW_RATE` and `STEEP_HIGH_RATE`: adding CMDTY_FUT to inverse-vol allocation in `STEEP_HIGH_RATE_NORMAL` improves return and reduces SPY path drawdown. We also ran an inverse-vol window grid search and found the strategy was not materially sensitive across reasonable windows, so the final mainline keeps a 90-day inverse-vol setting.
 
 ### Extreme Inflation
 
@@ -102,15 +104,15 @@ When a trigger fires, it creates an active lock. The strategy stays in full-risk
 
 | Trigger | Enabled Regimes | Entry | Unlock | Economic Meaning | Main Purpose |
 |---|---|---|---|---|---|
-| VIX lock | `STEEP`, `FLAT_LOW_RATE`, `FLAT_HIGH_RATE` | `VIX_ZSCORE_120D >= 3.0` | `VIX_ZSCORE_120D < 1.5` | Fast panic / volatility shock | Catch sudden volatility stress |
+| VIX lock | `STEEP_LOW_RATE`, `STEEP_HIGH_RATE`, `FLAT_LOW_RATE`, `FLAT_HIGH_RATE` | `VIX_ZSCORE_120D >= 3.0` | `VIX_ZSCORE_120D < 1.5` | Fast panic / volatility shock | Catch sudden volatility stress |
 | Credit lock | `FLAT_LOW_RATE`, `FLAT_HIGH_RATE` | SPY drawdown <= -5% and `D_CREDIT_SPREAD_15D > 0.10` | `D_CREDIT_SPREAD_15D < 0` and SPY > MA20 | Price-confirmed credit stress | Avoid credit-led drawdowns |
-| Commodity lock | `STEEP` | `CMDTY_RET60 < -10%` | `CMDTY_RET60 > -5%` and SPY > MA20 | STEEP slow-growth / commodity-led stress | Repair 2015-2016 style stress |
+| Commodity lock | `STEEP_LOW_RATE`, `STEEP_HIGH_RATE` | `CMDTY_RET60 < -10%` | `CMDTY_RET60 > -5%` and SPY > MA20 | STEEP slow-growth / commodity-led stress | Repair 2015-2016 style stress |
 
 Important design choices:
 
 - Monthly SELL is not used in the final strategy.
 - Credit trigger is not enabled in `INVERTED`.
-- Commodity trigger is only used in `STEEP`.
+- Commodity trigger is only used inside confirmed STEEP regimes, across both low-rate and high-rate STEEP normal states.
 - If VIX and credit locks are both active, VIX unlock also unlocks credit.
 
 ## 6. Trigger-to-Unlock Episode Diagnostics
@@ -152,7 +154,8 @@ Summary:
 - `FLAT_LOW_RATE_STRESS`: GOLD has the strongest defensive profile.
 - `FLAT_HIGH_RATE_NORMAL`: GOLD and commodities dominate SPY. IEF is not included in the final normal pool.
 - `FLAT_HIGH_RATE_STRESS`: IEF performs best, with CASH used as a stabilizer.
-- `STEEP_NON_RISK`: SPY is the return engine.
+- `STEEP_LOW_RATE_NORMAL`: SPY is the return engine.
+- `STEEP_HIGH_RATE_NORMAL`: SPY remains useful, but CMDTY_FUT improves diversification and lowers the SPY-only drawdown profile.
 - `STEEP_FULL_RISK`: 30% GOLD / 70% IEF is used instead of a single hedge asset.
 - `INVERTED`: the final strategy keeps SPY / GOLD inverse-vol and does not force a full-risk state.
 
@@ -168,8 +171,9 @@ Summary:
 | `FLAT_LOW_RATE` | Stress | VIX or credit lock active | 100% GOLD | Gold is the strongest defensive asset in this cross-state |
 | `FLAT_HIGH_RATE` | Normal | No active VIX or credit lock | GOLD / CMDTY_FUT inverse-vol | High-rate flat state favors real assets over SPY |
 | `FLAT_HIGH_RATE` | Stress | VIX or credit lock active | 90% IEF / 10% CASH | IEF has the best stress evidence; CASH stabilizes the hedge sleeve |
-| `STEEP` | Normal | No active VIX or commodity lock | 100% SPY | STEEP is typically equity-friendly |
-| `STEEP` | Full risk | VIX or commodity lock active | 30% GOLD / 70% IEF | IEF handles duration stress; GOLD diversifies commodity / inflation shock risk |
+| `STEEP_LOW_RATE` | Normal | No active VIX or commodity lock | 100% SPY | Low short-rate STEEP remains equity-friendly |
+| `STEEP_HIGH_RATE` | Normal | No active VIX or commodity lock | SPY / CMDTY_FUT inverse-vol | Higher short-rate STEEP benefits from commodity diversification |
+| `STEEP` | Full risk | VIX or commodity lock active | 30% GOLD / 70% IEF | Stress remains merged; IEF handles duration stress and GOLD diversifies commodity / inflation shock risk |
 | `INVERTED` | Normal only | No full-risk trigger enabled | SPY / GOLD inverse-vol | Inversion is not treated as automatic cash risk-off |
 
 ## 9. Backtest Results
@@ -178,14 +182,14 @@ Summary:
 |---|---:|---:|---:|---:|---:|---:|
 | SPY_BUY_HOLD | 11.14% | 0.575 | 0.702 | -55.19% | 0.202 | 8.38 |
 | SPY_CASH_TIMING | 12.04% | 0.948 | 1.101 | -29.45% | 0.409 | 9.86 |
-| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 19.63% | 1.460 | 1.959 | -18.28% | 1.074 | 36.91 |
+| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 20.20% | 1.492 | 2.013 | -15.94% | 1.267 | 40.61 |
 
 Compared with SPY buy-and-hold:
 
-- CAGR improves from 11.14% to 19.63%.
-- Sharpe improves from 0.575 to 1.460.
-- MaxDD falls from -55.19% to -18.28%.
-- Final equity improves from 8.38 to 36.91.
+- CAGR improves from 11.14% to 20.20%.
+- Sharpe improves from 0.575 to 1.492.
+- MaxDD falls from -55.19% to -15.94%.
+- Final equity improves from 8.38 to 40.61.
 
 The improvement is not from a single optimized trigger. It comes from the interaction of regime-specific triggers, trigger-lock stress episodes, regime-specific hedge allocation, and inverse-vol normal allocation.
 
@@ -201,10 +205,10 @@ The improvement is not from a single optimized trigger. It comes from the intera
 
 | Window | Main Stress Type | Trigger / State | Hedge Behavior | Result |
 |---|---|---|---|---|
-| 2008 GFC | Credit and broad risk stress | FLAT_HIGH credit, later STEEP commodity lock | IEF / GOLD hedge exposure avoided the largest equity damage | Final +47.75%, SPY -37.16% |
-| 2015-2016 | Commodity / growth stress | STEEP commodity lock | GOLD / IEF hedge repaired the original missed slow-growth stress | Final +19.72%, MaxDD -4.01% |
+| 2008 GFC | Credit and broad risk stress | FLAT_HIGH credit, later STEEP commodity lock | IEF / GOLD hedge exposure avoided the largest equity damage | Final +54.73%, SPY -37.16% |
+| 2015-2016 | Commodity / growth stress | STEEP commodity lock | GOLD / IEF hedge repaired the original missed slow-growth stress | Final +14.43%, MaxDD -6.29% |
 | COVID 2020 | Fast volatility shock | FLAT_LOW VIX / credit locks | GOLD helped, though fast SPY recovery created opportunity cost | Final +27.41%, MaxDD -15.50% |
-| 2022 rate / inflation / war shock | Rate shock and inflation stress | STEEP / FLAT locks | Regime-specific hedge sleeves beat SPY and SPY/CASH timing | Final +6.07%, MaxDD -14.39% |
+| 2022 rate / inflation / war shock | Rate shock and inflation stress | STEEP / FLAT locks | Regime-specific hedge sleeves beat SPY and SPY/CASH timing | Final +6.60%, MaxDD -14.09% |
 | 2025 pullback | High-rate volatility stress | FLAT_HIGH VIX lock | IEF / CASH stress sleeve reduced drawdown | Final +19.99%, MaxDD -7.79% |
 
 Case studies:
@@ -226,7 +230,7 @@ Diagnostic summary:
 - Total full-risk entries: 35.
 - Total full-risk exits: 35.
 - Top turnover events are full-risk unlock exits and VIX entries.
-- `STEEP -> STEEP` turnover is mostly internal transition between `STEEP_NON_RISK` and `STEEP_FULL_RISK`.
+- `STEEP -> STEEP` turnover is mostly internal transition between `STEEP_LOW_RATE_NORMAL`, `STEEP_HIGH_RATE_NORMAL`, and `STEEP_FULL_RISK`.
 - Recovery overlay is not part of the final mainline.
 
 Relevant figures:
@@ -243,8 +247,10 @@ Relevant figures:
 - It does not depend on old validated or exploratory result folders.
 - Signal day `t` affects position on day `t+1`.
 - Regime confirmation requires 3 consecutive days.
+- FLAT low/high uses rounded `GS10 = 3.0`.
+- STEEP low/high uses `GS1 = 0.3` with 3-day confirmation.
 - There is no `NEUTRAL` regime and no fallback allocation.
-- Inverse-volatility uses a 120 trading day window.
+- Inverse-volatility uses a 90 trading day window. A light grid search across reasonable windows showed only limited performance sensitivity, so the final mainline keeps 90.
 - Transaction cost is 10 bps one-way.
 - CASH uses compounded daily DTB3.
 - Credit spread uses WBAA - WAAA.

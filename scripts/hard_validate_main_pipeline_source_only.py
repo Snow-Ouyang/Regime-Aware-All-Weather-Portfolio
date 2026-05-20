@@ -317,7 +317,7 @@ def _mismatch_intervals(details: pd.DataFrame) -> pd.DataFrame:
 
 
 def write_after_fix_outputs(source: pd.DataFrame, comp: pd.DataFrame, details: pd.DataFrame) -> None:
-    out = ROOT / "results" / "source_only_after_fix"
+    out = OUT / "legacy_after_fix_comparison"
     out.mkdir(parents=True, exist_ok=True)
 
     rename_map = {
@@ -375,8 +375,7 @@ def write_after_fix_outputs(source: pd.DataFrame, comp: pd.DataFrame, details: p
             ("SPY_BUY_HOLD", "SPY_BUY_HOLD"),
             ("BACKBONE_V2_SPY_CASH", "SPY_CASH_TIMING"),
             ("FLAT_RATE_REFINED_L50_H30", "FLAT_RATE_REFINED_L50_H30"),
-            ("RECOVERY_20D_EQUAL_WEIGHT_FLAT_LOW_ONLY", "FINAL_REGIME_HEDGE_RECOVERY"),
-            ("MATURE_REGIME_HEDGE_FINAL", "MATURE_REGIME_HEDGE_FINAL"),
+            ("FINAL_REGIME_HEDGE_TRIGGER_LOCK", "FINAL_REGIME_HEDGE_TRIGGER_LOCK"),
         ]
         for ref_name, src_name in candidates:
             ref_ret = f"{ref_name}_return"
@@ -420,7 +419,7 @@ definition of correctness.
   term-spread regimes `INVERTED`, `FLAT`, and `STEEP` with 3-day confirmation
   initialized from the first raw regime.
 - FLAT can be split into `FLAT_LOW_RATE` and `FLAT_HIGH_RATE` for allocation via
-  the canonical GS10 threshold of 2.9.
+  the canonical GS10 threshold of 3.0.
 
 ## Bug Fixes / Canonical Formula Fixes
 
@@ -514,8 +513,6 @@ def main() -> None:
     comp, details = compare_source_to_reference(source)
     comp.to_csv(OUT / "source_rebuild_field_comparison.csv", index=False)
     details.to_csv(OUT / "source_rebuild_field_comparison_detail.csv", index=False)
-    write_after_fix_outputs(source, comp, details)
-
     report = write_report(dep, comp)
     print(report.split("## Conclusion", 1)[0])
     print("Dependency hard validation complete.")

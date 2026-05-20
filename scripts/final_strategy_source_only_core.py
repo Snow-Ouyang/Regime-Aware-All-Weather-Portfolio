@@ -38,8 +38,9 @@ ASSET_RETURN_MAP = {
     "IEF_return": "IEF",
 }
 CONFIRMATION_DAYS = 3
-GS10_THRESHOLD = 2.9
-INV_VOL_WINDOW = 120
+GS10_THRESHOLD = 3.0
+STEEP_GS1_THRESHOLD = 0.3
+INV_VOL_WINDOW = 90
 ONE_WAY_COST_BPS = 10.0
 RECOVERY_WINDOW = 20
 TRIGGER_LOCK_CREDIT_WINDOW = 15
@@ -91,6 +92,19 @@ def confirm_state(raw: Iterable[str], confirmation_days: int = CONFIRMATION_DAYS
             candidate = current
             count = 0
         confirmed.append(current)
+    return confirmed
+
+
+def confirm_steep_rate_split(df: pd.DataFrame, threshold: float = STEEP_GS1_THRESHOLD) -> pd.Series:
+    """Confirm STEEP low/high short-rate labels within confirmed STEEP blocks."""
+    steep = df["refined_regime_confirmed"].eq("STEEP")
+    raw = pd.Series(index=df.index, dtype="object")
+    raw.loc[steep] = df.loc[steep, "GS1"].le(threshold).map({True: "STEEP_LOW_RATE", False: "STEEP_HIGH_RATE"})
+    confirmed = pd.Series(index=df.index, dtype="object")
+    block_id = (steep.ne(steep.shift(1)) & steep).cumsum()
+    for _, idx in df.index[steep].to_series().groupby(block_id[steep]):
+        labels = raw.loc[idx].astype(str).tolist()
+        confirmed.loc[idx] = confirm_state(labels, confirmation_days=CONFIRMATION_DAYS, initial=labels[0])
     return confirmed
 
 
@@ -184,6 +198,11 @@ def build_source_panel() -> pd.DataFrame:
     )
     panel["refined_regime_raw"] = refined_raw
     panel["refined_regime_confirmed"] = confirm_state(refined_raw, confirmation_days=CONFIRMATION_DAYS, initial=str(refined_raw[0]))
+    panel["steep_rate_regime_confirmed"] = confirm_steep_rate_split(panel)
+    panel["final_regime_confirmed"] = panel["refined_regime_confirmed"]
+    panel.loc[panel["refined_regime_confirmed"].eq("STEEP"), "final_regime_confirmed"] = panel.loc[
+        panel["refined_regime_confirmed"].eq("STEEP"), "steep_rate_regime_confirmed"
+    ]
     panel["monthly_either_state"] = build_monthly_either_state(panel)
 
     panel = panel.loc[panel["date"] >= pd.Timestamp("2006-03-16")].reset_index(drop=True)
@@ -209,8 +228,8 @@ def first_trading_day_of_month(dates: pd.Series) -> pd.Series:
     return month.ne(month.shift(1))
 
 
-def monthly_hold_weights(df: pd.DataFrame, pool: list[str]) -> pd.DataFrame:
-    daily = inverse_vol_weights(df, pool)
+def monthly_hold_weights(df: pd.DataFrame, pool: list[str], window: int = INV_VOL_WINDOW) -> pd.DataFrame:
+    daily = inverse_vol_weights(df, pool, window=window)
     rebalance = first_trading_day_of_month(df["date"])
     held = pd.DataFrame(index=df.index, columns=pool, dtype=float)
     current = pd.Series({asset: 1.0 / len(pool) for asset in pool})
@@ -285,11 +304,12 @@ def build_backbone_and_states(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def base_refined_weights(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+def base_refined_weights(df: pd.DataFrame, inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.Series]:
     out = df.copy()
-    flat_low_normal = monthly_hold_weights(out, ["SPY", "CMDTY_FUT"])
-    flat_high_normal = monthly_hold_weights(out, ["GOLD", "CMDTY_FUT"])
-    inverted_normal = monthly_hold_weights(out, ["SPY", "GOLD"])
+    flat_low_normal = monthly_hold_weights(out, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    flat_high_normal = monthly_hold_weights(out, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
+    steep_high_normal = monthly_hold_weights(out, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    inverted_normal = monthly_hold_weights(out, ["SPY", "GOLD"], window=inv_vol_window)
     weights = pd.DataFrame(0.0, index=out.index, columns=ASSETS)
     states = []
     for i, row in out.iterrows():
@@ -317,9 +337,12 @@ def base_refined_weights(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
             elif slow:
                 w = {"SPY": 0.50, "IEF": 0.50}
                 state = "STEEP_SLOW_GROWTH_OVERLAY"
+            elif row["steep_rate_regime_confirmed"] == "STEEP_HIGH_RATE":
+                w = steep_high_normal.loc[i].to_dict()
+                state = "STEEP_HIGH_RATE_NORMAL"
             else:
                 w = {"SPY": 1.0}
-                state = "STEEP_NON_RISK"
+                state = "STEEP_LOW_RATE_NORMAL"
         elif refined == "INVERTED":
             w = inverted_normal.loc[i].to_dict()
             state = "INVERTED"
@@ -365,8 +388,10 @@ def apply_flat_low_recovery(df: pd.DataFrame, base_weights: pd.DataFrame, base_s
 def normal_allocation_by_regime(
     i: int,
     refined: str,
+    steep_rate: str,
     flat_low_normal: pd.DataFrame,
     flat_high_normal: pd.DataFrame,
+    steep_high_normal: pd.DataFrame,
     inverted_normal: pd.DataFrame,
 ) -> tuple[dict[str, float], str]:
     if refined == "FLAT_LOW_RATE":
@@ -374,7 +399,9 @@ def normal_allocation_by_regime(
     if refined == "FLAT_HIGH_RATE":
         return flat_high_normal.loc[i].to_dict(), "FLAT_HIGH_RATE_NORMAL"
     if refined == "STEEP":
-        return {"SPY": 1.0}, "STEEP_NON_RISK"
+        if steep_rate == "STEEP_HIGH_RATE":
+            return steep_high_normal.loc[i].to_dict(), "STEEP_HIGH_RATE_NORMAL"
+        return {"SPY": 1.0}, "STEEP_LOW_RATE_NORMAL"
     if refined == "INVERTED":
         return inverted_normal.loc[i].to_dict(), "INVERTED"
     raise ValueError(f"Unexpected refined regime: {refined}")
@@ -429,10 +456,13 @@ def unlock_trigger_locks(row: pd.Series, active_locks: set[str]) -> set[str]:
     return unlocked
 
 
-def build_trigger_lock_final_weights(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    flat_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"])
-    flat_high_normal = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"])
-    inverted_normal = monthly_hold_weights(df, ["SPY", "GOLD"])
+def build_trigger_lock_final_weights(
+    df: pd.DataFrame, inv_vol_window: int = INV_VOL_WINDOW
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    flat_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    flat_high_normal = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
+    steep_high_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    inverted_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
     weights = pd.DataFrame(0.0, index=df.index, columns=ASSETS)
 
     current_full_risk = False
@@ -454,7 +484,13 @@ def build_trigger_lock_final_weights(df: pd.DataFrame) -> tuple[pd.DataFrame, pd
         if current_full_risk:
             if refined == "INVERTED":
                 w, allocation_state = normal_allocation_by_regime(
-                    i, refined, flat_low_normal, flat_high_normal, inverted_normal
+                    i,
+                    refined,
+                    row["steep_rate_regime_confirmed"],
+                    flat_low_normal,
+                    flat_high_normal,
+                    steep_high_normal,
+                    inverted_normal,
                 )
             else:
                 w, allocation_state = stress_allocation_by_regime(refined)
@@ -473,7 +509,13 @@ def build_trigger_lock_final_weights(df: pd.DataFrame) -> tuple[pd.DataFrame, pd
                 pending_locks = set(current_locks)
         else:
             w, allocation_state = normal_allocation_by_regime(
-                i, refined, flat_low_normal, flat_high_normal, inverted_normal
+                i,
+                refined,
+                row["steep_rate_regime_confirmed"],
+                flat_low_normal,
+                flat_high_normal,
+                steep_high_normal,
+                inverted_normal,
             )
             new_locks = allowed_trigger_locks(row)
             if new_locks:
@@ -553,11 +595,11 @@ def performance_metrics(df: pd.DataFrame, name: str) -> dict:
     }
 
 
-def build_final_source_only_panel() -> tuple[pd.DataFrame, pd.DataFrame]:
+def build_final_source_only_panel(inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.DataFrame]:
     panel = build_source_panel()
     panel = build_backbone_and_states(panel)
-    base_weights, base_states = base_refined_weights(panel)
-    final_weights, trigger_lock_state = build_trigger_lock_final_weights(panel)
+    base_weights, base_states = base_refined_weights(panel, inv_vol_window=inv_vol_window)
+    final_weights, trigger_lock_state = build_trigger_lock_final_weights(panel, inv_vol_window=inv_vol_window)
 
     base = compute_strategy(panel, base_weights, REFINED_BASELINE)
     final = compute_strategy(panel, final_weights, FINAL_STRATEGY)
@@ -588,11 +630,13 @@ def build_final_source_only_panel() -> tuple[pd.DataFrame, pd.DataFrame]:
     return out, perf
 
 
-def write_source_only_outputs(output_dir: Path | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+def write_source_only_outputs(
+    output_dir: Path | None = None, inv_vol_window: int = INV_VOL_WINDOW
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     out_dir = output_dir or ROOT / "results" / "final_strategy_source_only"
     table_dir = out_dir / "tables"
     table_dir.mkdir(parents=True, exist_ok=True)
-    panel, perf = build_final_source_only_panel()
+    panel, perf = build_final_source_only_panel(inv_vol_window=inv_vol_window)
     panel.to_csv(out_dir / "daily_backtest_panel.csv", index=False)
     perf.to_csv(table_dir / "performance_summary.csv", index=False)
     panel[
@@ -600,6 +644,8 @@ def write_source_only_outputs(output_dir: Path | None = None) -> tuple[pd.DataFr
             "date",
             "macro_regime_confirmed",
             "refined_regime_confirmed",
+            "final_regime_confirmed",
+            "steep_rate_regime_confirmed",
             "flat_refined_state",
             "final_allocation_state",
             "final_state",
