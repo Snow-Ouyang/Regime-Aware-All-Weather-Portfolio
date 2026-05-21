@@ -440,8 +440,7 @@ def allowed_trigger_locks(row: pd.Series) -> set[str]:
     locks: set[str] = set()
     vix_entry = bool(row["VIX_ZSCORE_120D"] >= 3.0)
     credit_entry = bool(
-        (row["spy_drawdown_from_previous_high"] <= -0.05)
-        and (row["D_CREDIT_SPREAD_15D"] > TRIGGER_LOCK_CREDIT_ENTRY_THRESHOLD)
+        (row["D_CREDIT_SPREAD_15D"] > TRIGGER_LOCK_CREDIT_ENTRY_THRESHOLD)
         and (not bool(row["SPY_above_MA20"]))
     )
     if regime in {"FLAT_LOW_RATE", "FLAT_HIGH_RATE", "INVERTED"}:
@@ -459,7 +458,6 @@ def unlock_trigger_locks(row: pd.Series, active_locks: set[str]) -> set[str]:
     vix_unlock = bool((row["VIX_ZSCORE_120D"] < 1.5) and spy_above_ma20)
     credit_unlock = bool(
         bool(row["SPY_above_MA50"])
-        and (row["D_CREDIT_SPREAD_15D"] < TRIGGER_LOCK_CREDIT_EXIT_THRESHOLD)
         and pd.notna(row["CREDIT_LEVEL_Z_252D"])
         and (row["CREDIT_LEVEL_Z_252D"] < TRIGGER_LOCK_CREDIT_LEVEL_Z_EXIT_THRESHOLD)
     )

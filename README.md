@@ -111,7 +111,7 @@ When a trigger fires first, it becomes the anchor lock. If another lock is added
 | Trigger | Enabled Regimes | Entry | Unlock | Economic Meaning | Main Purpose |
 |---|---|---|---|---|---|
 | VIX lock | `FLAT_LOW_RATE`, `FLAT_HIGH_RATE`, `INVERTED` | `VIX_ZSCORE_120D >= 3.0` | `VIX_ZSCORE_120D < 1.5` and `SPY > MA20` | Fast panic / volatility shock | Catch fast-risk episodes without needing a commodity trigger |
-| Credit lock | `FLAT_LOW_RATE`, `FLAT_HIGH_RATE`, `STEEP_LOW_RATE`, `STEEP_HIGH_RATE`, `INVERTED` | `SPY_DD <= -5%`, `D_CREDIT_SPREAD_15D > 0.10`, and `SPY <= MA20` | `D_CREDIT_SPREAD_15D < 0`, `SPY > MA50`, and `CREDIT_LEVEL_Z_252D < 0.9` | Price-confirmed, still-elevated credit stress | Catch sustained and stair-step credit stress such as 2008 and 2022 |
+| Credit lock | `FLAT_LOW_RATE`, `FLAT_HIGH_RATE`, `STEEP_LOW_RATE`, `STEEP_HIGH_RATE`, `INVERTED` | `D_CREDIT_SPREAD_15D > 0.10` and `SPY <= MA20` | `SPY > MA50` and `CREDIT_LEVEL_Z_252D < 0.9` | Price-confirmed, still-elevated credit stress | Catch sustained and stair-step credit stress such as 2008 and 2022 |
 
 Anchor exit logic:
 
@@ -239,7 +239,7 @@ Case-study figures:
 - Transaction cost is 10 bps one-way.
 - CASH uses compounded daily DTB3.
 - Credit spread is daily `DBAA - DAAA`, filled to the trading calendar before feature construction.
-- Credit unlock uses `CREDIT_LEVEL_Z_252D < 0.9`, so the spread level must normalize before a credit-led stress exit.
+- Credit unlock uses `SPY > MA50` together with `CREDIT_LEVEL_Z_252D < 0.9`, so the spread level must normalize before a credit-led stress exit.
 - Commodity trigger is not used in the final mainline.
 
 Main run order:

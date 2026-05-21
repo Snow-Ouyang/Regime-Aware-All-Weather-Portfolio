@@ -60,8 +60,8 @@ The canonical final strategy uses a trigger-lock state machine. This replaced th
 - `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `STEEP_LOW_RATE` / `STEEP_HIGH_RATE` / `INVERTED`: credit trigger is active.
 - Commodity trigger is not part of the final mainline.
 - Monthly SELL is not part of the final state machine.
-- Credit entry uses `D_CREDIT_SPREAD_15D > 0.10`, `SPY drawdown <= -5%`, and `SPY <= MA20`.
-- Credit unlock uses `D_CREDIT_SPREAD_15D < 0`, `SPY > MA50`, and `CREDIT_LEVEL_Z_252D < 0.9`.
+- Credit entry uses `D_CREDIT_SPREAD_15D > 0.10` and `SPY <= MA20`.
+- Credit unlock uses `SPY > MA50` and `CREDIT_LEVEL_Z_252D < 0.9`.
 - VIX unlock uses `VIX_ZSCORE_120D < 1.5` with `SPY > MA20`.
 - The anchor-exit rule means VIX-led stress exits on VIX unlock, credit-led stress exits on credit unlock, and BOTH entries unlock independently.
 

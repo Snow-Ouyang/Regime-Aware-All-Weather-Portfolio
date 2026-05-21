@@ -110,9 +110,7 @@ def add_trigger_flags(panel: pd.DataFrame) -> pd.DataFrame:
     out["VIX_FULL_RISK_TRIGGER"] = out["final_regime"].isin(["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "INVERTED"]) & (
         out["VIX_ZSCORE_120D"] >= 3.0
     )
-    out["RAW_CREDIT_DRAWDOWN_TRIGGER"] = (out["spy_drawdown_from_previous_high"] <= -0.05) & (
-        out["D_CREDIT_SPREAD_15D"] > 0.10
-    )
+    out["RAW_CREDIT_DRAWDOWN_TRIGGER"] = (out["D_CREDIT_SPREAD_15D"] > 0.10) & (~out["SPY_above_MA20"])
     out["EFFECTIVE_CREDIT_DRAWDOWN_TRIGGER"] = out["RAW_CREDIT_DRAWDOWN_TRIGGER"] & out["final_regime"].isin(
         ["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_HIGH_RATE", "INVERTED"]
     )
@@ -743,8 +741,8 @@ This module is diagnostic only. It does not change the canonical final strategy 
 - `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `INVERTED`: VIX lock is active.
 - `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `STEEP_LOW_RATE` / `STEEP_HIGH_RATE` / `INVERTED`: credit lock is active.
 - Commodity lock is disabled in the final mainline.
-- Credit entry uses `SPY drawdown <= -5%`, `D_CREDIT_SPREAD_15D > 0.10`, and `SPY <= MA20`.
-- Credit unlock uses `D_CREDIT_SPREAD_15D < 0`, `SPY > MA50`, and `CREDIT_LEVEL_Z_252D < 0.9`.
+- Credit entry uses `D_CREDIT_SPREAD_15D > 0.10` and `SPY <= MA20`.
+- Credit unlock uses `SPY > MA50` and `CREDIT_LEVEL_Z_252D < 0.9`.
 - VIX unlock uses `VIX_ZSCORE_120D < 1.5` with `SPY > MA20`.
 - The state machine uses anchor exits: if stress began with VIX, VIX unlock is sufficient; if stress began with CREDIT, credit unlock is sufficient; if both were active at entry, each unlocks independently.
 - Monthly SELL and recovery overlay are not part of the final state machine.
@@ -758,7 +756,7 @@ This module is diagnostic only. It does not change the canonical final strategy 
 
 ### Implication
 
-The final mainline keeps the daily credit trigger with MA50 and credit-level normalization unlock, and does not include recovery overlay or broader parameter search.
+The final mainline keeps the simplified daily credit trigger with MA50 and credit-level normalization unlock, and does not include recovery overlay or broader parameter search.
 """
     path.write_text(existing + "\n" + section.strip() + "\n", encoding="utf-8")
 
