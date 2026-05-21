@@ -39,17 +39,17 @@ def load_panel() -> pd.DataFrame:
 
 def allocation_state(row: pd.Series) -> str:
     state = str(row.get("final_allocation_state", row.get("flat_refined_state", "OTHER")))
-    if state == "INVERTED":
-        return "INVERTED"
     valid = {
         "FLAT_LOW_RATE_NORMAL",
         "FLAT_LOW_RATE_STRESS",
         "FLAT_HIGH_RATE_NORMAL",
         "FLAT_HIGH_RATE_STRESS",
         "STEEP_LOW_RATE_NORMAL",
+        "STEEP_LOW_RATE_STRESS",
         "STEEP_HIGH_RATE_NORMAL",
-        "STEEP_FULL_RISK",
-        "INVERTED",
+        "STEEP_HIGH_RATE_STRESS",
+        "INVERTED_NORMAL",
+        "INVERTED_STRESS",
     }
     return state if state in valid else "OTHER"
 
@@ -107,18 +107,18 @@ def add_trigger_flags(panel: pd.DataFrame) -> pd.DataFrame:
         "OTHER",
     )
     out["allocation_state"] = out.apply(allocation_state, axis=1)
-    out["VIX_FULL_RISK_TRIGGER"] = out["refined_regime"].isin(["STEEP", "FLAT_LOW_RATE", "FLAT_HIGH_RATE"]) & (
+    out["VIX_FULL_RISK_TRIGGER"] = out["final_regime"].isin(["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "INVERTED"]) & (
         out["VIX_ZSCORE_120D"] >= 3.0
     )
     out["RAW_CREDIT_DRAWDOWN_TRIGGER"] = (out["spy_drawdown_from_previous_high"] <= -0.05) & (
         out["D_CREDIT_SPREAD_15D"] > 0.10
     )
-    out["EFFECTIVE_CREDIT_DRAWDOWN_TRIGGER"] = out["RAW_CREDIT_DRAWDOWN_TRIGGER"] & out["refined_regime"].isin(
-        ["FLAT_LOW_RATE", "FLAT_HIGH_RATE"]
+    out["EFFECTIVE_CREDIT_DRAWDOWN_TRIGGER"] = out["RAW_CREDIT_DRAWDOWN_TRIGGER"] & out["final_regime"].isin(
+        ["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_HIGH_RATE", "INVERTED"]
     )
     out["CREDIT_FULL_RISK_TRIGGER"] = out["EFFECTIVE_CREDIT_DRAWDOWN_TRIGGER"]
     out["MONTHLY_SELL_FULL_RISK_TRIGGER"] = False
-    out["CMDTY_FULL_RISK_TRIGGER"] = out["refined_regime"].eq("STEEP") & (out["CMDTY_RET60"] < -0.10)
+    out["CMDTY_FULL_RISK_TRIGGER"] = False
     out["STEEP_SLOW_GROWTH_OVERLAY_TRIGGER"] = False
     out["FULL_RISK_TRIGGER_ANY"] = out["VIX_FULL_RISK_TRIGGER"] | out["CREDIT_FULL_RISK_TRIGGER"] | out["CMDTY_FULL_RISK_TRIGGER"]
     out["FULL_RISK_ACTIVE"] = out["trigger_lock_full_risk_state"].eq("FULL_RISK")
@@ -740,25 +740,25 @@ This module is diagnostic only. It does not change the canonical final strategy 
 
 ### Trigger Rules Summary
 
-- `STEEP`: VIX and commodity locks are active.
-- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE`: VIX and credit locks are active.
-- `INVERTED`: no full-risk trigger is active.
-- Credit entry uses `SPY drawdown <= -5%` and `D_CREDIT_SPREAD_15D > 0.10`.
-- Credit unlock uses `D_CREDIT_SPREAD_15D < 0` and `SPY > MA20`.
-- VIX unlock uses `VIX_ZSCORE_120D < 1.5`; when VIX and CREDIT locks are both active, VIX unlock also unlocks CREDIT.
-- Commodity unlock uses `CMDTY_RET60 > -5%` and `SPY > MA20`.
+- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `INVERTED`: VIX lock is active.
+- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `STEEP_LOW_RATE` / `STEEP_HIGH_RATE` / `INVERTED`: credit lock is active.
+- Commodity lock is disabled in the final mainline.
+- Credit entry uses `SPY drawdown <= -5%`, `D_CREDIT_SPREAD_15D > 0.10`, and `SPY <= MA20`.
+- Credit unlock uses `D_CREDIT_SPREAD_15D < 0`, `SPY > MA50`, and `CREDIT_LEVEL_Z_252D < 0.9`.
+- VIX unlock uses `VIX_ZSCORE_120D < 1.5` with `SPY > MA20`.
+- The state machine uses anchor exits: if stress began with VIX, VIX unlock is sufficient; if stress began with CREDIT, credit unlock is sufficient; if both were active at entry, each unlocks independently.
 - Monthly SELL and recovery overlay are not part of the final state machine.
 
 ### Key Findings
 
 - FULL_RISK entries and trigger-lock exits explain the main turnover.
-- `SPY_CASH_TIMING`, cross-state asset behavior, and the final hedge strategy now use the same trigger-lock stress definition.
+- `SPY_CASH_TIMING`, cross-state asset behavior, and the final hedge strategy now use the same VIX/CREDIT anchor stress definition.
 - FLAT_LOW/HIGH switches and inverse-vol rebalances are secondary contributors.
 - {notes}
 
 ### Implication
 
-The final mainline keeps the credit15 trigger-lock state machine and does not include cooldown, recovery overlay, or further parameter search.
+The final mainline keeps the daily credit trigger with MA50 and credit-level normalization unlock, and does not include recovery overlay or broader parameter search.
 """
     path.write_text(existing + "\n" + section.strip() + "\n", encoding="utf-8")
 

@@ -39,8 +39,8 @@ The final main pipeline is considered source-only only if numbered main scripts 
 | IEF_return             | PASS     | 5074 |            1 |                0 |    0           |     0           |          |
 | CASH_return            | PASS     | 5074 |            1 |                0 |    9.98279e-17 |     1.38998e-17 |          |
 | VIX_ZSCORE_120D        | PASS     | 5074 |            1 |                0 |    8.88178e-16 |     3.1305e-17  |          |
-| CREDIT_SPREAD_BAA_AAA  | PASS     | 5074 |            1 |                0 |    4.44089e-16 |     2.68256e-17 |          |
-| D_CREDIT_SPREAD_20D    | PASS     | 5074 |            1 |                0 |    9.88792e-17 |     4.11093e-17 |          |
+| CREDIT_SPREAD_BAA_AAA  | PASS     | 5074 |            1 |                0 |    4.44089e-16 |     2.47032e-17 |          |
+| D_CREDIT_SPREAD_20D    | PASS     | 5074 |            1 |                0 |    2.22045e-16 |     4.2006e-17  |          |
 | CMDTY_RET60            | PASS     | 5074 |            1 |                0 |    9.97466e-17 |     4.18193e-17 |          |
 
 ## Conclusion

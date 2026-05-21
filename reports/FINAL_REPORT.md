@@ -11,13 +11,13 @@ The final strategy is:
 
 `FINAL_REGIME_HEDGE_TRIGGER_LOCK`
 
-It is source-only reproducible and does not rely on exploratory intermediate outputs.
+It is source-only reproducible and does not depend on exploratory intermediate outputs.
 
 ## 1. Motivation
 
-Most timing systems try to find a universal risk-off trigger. Most all-weather systems try to hold a static diversified portfolio across macro states. This project takes a different view.
+Most timing systems search for a universal risk-off trigger. Most all-weather systems search for a static hedge sleeve. This project takes a different view.
 
-Stress periods are heterogeneous. A VIX panic, a credit widening episode, a commodity-led growth scare, and an inflation/rate shock are not the same event. Likewise, the best hedge asset changes with the macro backdrop. CASH, IEF, GOLD, commodities, and SPY do not have stable roles across all regimes.
+Stress is heterogeneous. A VIX panic, a persistent credit-widening regime, a stair-step rate shock, and a commodity-led growth scare do not have the same structure. Likewise, the best hedge asset changes with the macro backdrop. CASH, IEF, GOLD, commodities, and SPY do not have stable roles across all regimes.
 
 The strategy therefore asks:
 
@@ -31,17 +31,15 @@ The regime framework was inspired by the earlier ML regime project:
 
 [Market-Regime-Clustering](https://github.com/Snow-Ouyang/Market-Regime-Clustering)
 
-The clustering / jump-model research was used as a discovery phase. It helped reveal the natural distribution of macro variables and highlighted that macro states differ across curve shape, inflation pressure, credit conditions, and growth stress.
+The clustering / jump-model research was used as a discovery phase. It revealed how macro variables naturally cluster and highlighted that stress states differ across curve shape, rate level, and credit pressure.
 
-The final strategy does **not** trade directly on ML states. Instead, the ML evidence was translated into simpler rule-based macro regimes because rule-based regimes are:
+The final strategy does **not** trade directly on ML labels. Instead, the ML evidence was translated into simpler rule-based macro regimes because rule-based regimes are:
 
-- interpretable;
-- stable across reruns;
-- easier to audit;
-- easier to reproduce from source data;
-- better suited for a transparent research project.
-
-Local note: the current cleaned repository does not retain the earlier clustering variable-distribution figures. Those can be restored from the upstream ML project if a separate discovery appendix is needed.
+- interpretable,
+- stable across reruns,
+- easier to audit,
+- easier to reproduce from source data,
+- and better suited to a transparent research project.
 
 ## 3. Final Regime Construction
 
@@ -61,105 +59,81 @@ Then raw `FLAT` is split by absolute rate level using `GS10 = 3.0`. Confirmed `S
 
 | Regime | Rule | Threshold Source | Economic Interpretation | Strategy Implication |
 |---|---|---|---|---|
-| `INVERTED` | `term_spread < 0` | Yield-curve inversion | Tight policy, late-cycle inversion, unreliable stress-trigger quality | No full-risk trigger; SPY / GOLD inverse-vol |
+| `INVERTED` | `term_spread < 0` | Yield-curve inversion | Tight policy, late-cycle inversion | Keep SPY/GOLD normal exposure but allow explicit stress states |
 | Raw `FLAT` | `0 <= term_spread <= 1` | Flat curve band | Curve shape is flat but rate level matters | Split by GS10 |
-| `FLAT_LOW_RATE` | raw `FLAT` and `GS10 <= 3.0` | Rounded flat-rate split | Low-rate flat state; SPY and commodities can still work | Normal pool uses SPY / CMDTY_FUT |
-| `FLAT_HIGH_RATE` | raw `FLAT` and `GS10 > 3.0` | Same GS10 split | High-rate flat state; equity exposure is less attractive | Normal pool uses GOLD / CMDTY_FUT |
-| `STEEP_LOW_RATE` | raw `STEEP` and confirmed `GS1 <= 0.3` | Short-rate split from STEEP GS1 diagnostics | Low short-rate steep curve; SPY remains the clean return engine | Normal pool uses 100% SPY |
-| `STEEP_HIGH_RATE` | raw `STEEP` and confirmed `GS1 > 0.3` | Same GS1 split with 3-day confirmation | Higher short-rate steep curve; commodities diversify equity exposure | Normal pool uses SPY / CMDTY_FUT inverse-vol |
+| `FLAT_LOW_RATE` | raw `FLAT` and `GS10 <= 3.0` | Rounded flat-rate split | Low-rate flat state; equity still has room to work | SPY / CMDTY_FUT normal sleeve |
+| `FLAT_HIGH_RATE` | raw `FLAT` and `GS10 > 3.0` | Same GS10 split | High-rate flat state favors real assets over SPY | GOLD / CMDTY_FUT normal sleeve |
+| `STEEP_LOW_RATE` | raw `STEEP` and confirmed `GS1 <= 0.3` | Short-rate split within STEEP | Low short-rate steep curve; SPY remains a strong return engine | 100% SPY normal sleeve |
+| `STEEP_HIGH_RATE` | raw `STEEP` and confirmed `GS1 > 0.3` | Same GS1 split with 3-day confirmation | Higher short-rate steep curve; broader diversification is useful | SPY / GOLD / CMDTY_FUT inverse-vol normal sleeve |
 
-The `GS10 = 3.0` threshold is the rounded version of the flat-rate diagnostic threshold. The `GS1 = 0.3` threshold is used inside confirmed `STEEP` regimes because GS1 better captures short-rate policy level, cash yield, and financing pressure than GS10. The main new finding is that commodities behave differently in `STEEP_LOW_RATE` and `STEEP_HIGH_RATE`: adding CMDTY_FUT to inverse-vol allocation in `STEEP_HIGH_RATE_NORMAL` improves return and reduces SPY path drawdown. We also ran an inverse-vol window grid search and found the strategy was not materially sensitive across reasonable windows, so the final mainline keeps a 90-day inverse-vol setting.
-
-### Extreme Inflation
-
-The ML discovery work showed oil-shock / policy-driven inflation-like states. In the current source-only tradable sample, there was not enough stable evidence to define a separate final `EXTREME_INFLATION` regime. The strategy therefore avoids forcing a regime that the sample cannot support. That said, this finding is one reason real assets, commodities, and gold are central to the final allocation research.
+The `GS10 = 3.0` threshold is the rounded version of the flat-rate diagnostic threshold. The `GS1 = 0.3` threshold is used inside confirmed `STEEP` regimes because GS1 better captures short-rate policy level, cash yield, and financing pressure than GS10.
 
 ## 4. Why This Is Not an All-Weather Portfolio
 
-Traditional all-weather portfolios are generally designed as static or semi-static diversification across growth and inflation quadrants.
+Traditional all-weather portfolios are generally static or semi-static allocations across growth and inflation quadrants.
 
 This project is different:
 
 - SPY remains the primary return engine.
-- Macro regime determines which stress triggers are active.
-- Stress episodes are managed with trigger locks rather than one-day exits.
+- Stress detection is regime-conditioned.
+- Stress episodes are managed with a lock state machine rather than one-day exits.
 - Hedge sleeves are regime-specific rather than universal.
 
 This is a SPY-centered regime-aware index enhancement strategy. The goal is not to minimize volatility at all costs, but to preserve equity participation while reducing major regime-specific drawdowns.
 
-Monthly trend timing was explored early as a benchmark, but it is not part of the final thesis. The final strategy replaces monthly timing with a higher-frequency trigger-lock stress system.
+Monthly timing was explored early as a benchmark, but it is not part of the final thesis. The final mainline now uses a cleaner VIX/CREDIT anchor state machine.
 
 ## 5. Regime-Specific Trigger-Lock Stress System
 
 The final stress module is a trigger-lock state machine.
 
-Each trigger has:
-
-- an enabled regime set;
-- an entry condition;
-- an unlock condition;
-- an economic interpretation.
-
-When a trigger fires, it creates an active lock. The strategy stays in full-risk mode until all active locks are unlocked. Locks can be added during an existing stress episode, and each lock can be released independently.
+When a trigger fires first, it becomes the anchor lock. If another lock is added during the same episode, the anchor still determines the main exit. This prevents late secondary signals from distorting the stress window.
 
 | Trigger | Enabled Regimes | Entry | Unlock | Economic Meaning | Main Purpose |
 |---|---|---|---|---|---|
-| VIX lock | `STEEP_LOW_RATE`, `STEEP_HIGH_RATE`, `FLAT_LOW_RATE`, `FLAT_HIGH_RATE` | `VIX_ZSCORE_120D >= 3.0` | `VIX_ZSCORE_120D < 1.5` | Fast panic / volatility shock | Catch sudden volatility stress |
-| Credit lock | `FLAT_LOW_RATE`, `FLAT_HIGH_RATE` | SPY drawdown <= -5% and `D_CREDIT_SPREAD_15D > 0.10` | `D_CREDIT_SPREAD_15D < 0` and SPY > MA20 | Price-confirmed credit stress | Avoid credit-led drawdowns |
-| Commodity lock | `STEEP_LOW_RATE`, `STEEP_HIGH_RATE` | `CMDTY_RET60 < -10%` | `CMDTY_RET60 > -5%` and SPY > MA20 | STEEP slow-growth / commodity-led stress | Repair 2015-2016 style stress |
+| VIX lock | `FLAT_LOW_RATE`, `FLAT_HIGH_RATE`, `INVERTED` | `VIX_ZSCORE_120D >= 3.0` | `VIX_ZSCORE_120D < 1.5` and `SPY > MA20` | Fast panic / volatility shock | Catch fast shocks, especially when inversion already exists |
+| Credit lock | `FLAT_LOW_RATE`, `FLAT_HIGH_RATE`, `STEEP_LOW_RATE`, `STEEP_HIGH_RATE`, `INVERTED` | `SPY_DD <= -5%`, `D_CREDIT_SPREAD_15D > 0.10`, and `SPY <= MA20` | `D_CREDIT_SPREAD_15D < 0`, `SPY > MA50`, and `CREDIT_LEVEL_Z_252D < 0.9` | Price-confirmed and still-elevated credit stress | Capture sustained and stair-step stress such as 2008 and 2022 |
 
-Important design choices:
+Anchor exit logic:
 
-- Monthly SELL is not used in the final strategy.
-- Credit trigger is not enabled in `INVERTED`.
-- Commodity trigger is only used inside confirmed STEEP regimes, across both low-rate and high-rate STEEP normal states.
-- If VIX and credit locks are both active, VIX unlock also unlocks credit.
+- If stress began with VIX, VIX unlock is sufficient to exit stress.
+- If stress began with credit, credit unlock is sufficient to exit stress.
+- If both were active at entry, they unlock independently.
+
+Commodity trigger is not part of the final mainline.
 
 ## 6. Trigger-to-Unlock Episode Diagnostics
 
-Forward 20-day return is useful, but it is incomplete for a lock-based strategy. The final strategy should be evaluated from trigger entry to unlock exit.
+Forward 20-day return is useful, but incomplete for a lock-based strategy. Trigger quality should be evaluated from entry to unlock.
 
-| Regime | Trigger | Episodes | Avg Lock Duration | Mean Strategy Return During Stress | Mean SPY Return During Stress | Mean SPY MaxDD During Stress | Mean Drawdown Reduction vs SPY |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| `FLAT_HIGH_RATE` | CREDIT | 2 | 66.0d | 3.99% | -3.25% | -15.50% | 11.97% |
-| `FLAT_HIGH_RATE` | VIX | 7 | 12.6d | -0.02% | 1.24% | -3.55% | 2.54% |
-| `FLAT_LOW_RATE` | CREDIT | 5 | 26.4d | 3.05% | 2.44% | -5.58% | 2.31% |
-| `FLAT_LOW_RATE` | VIX | 4 | 16.0d | 0.94% | -2.92% | -10.32% | 6.18% |
-| `STEEP_HIGH_RATE` | CMDTY | 4 | 71.2d | 5.83% | -10.12% | -18.28% | 15.09% |
-| `STEEP_HIGH_RATE` | VIX | 3 | 12.0d | 0.00% | 0.80% | -3.65% | 2.28% |
-| `STEEP_LOW_RATE` | CMDTY | 4 | 62.2d | 3.54% | 3.82% | -8.75% | 5.37% |
-| `STEEP_LOW_RATE` | VIX | 6 | 7.2d | -0.91% | 2.71% | -1.37% | 0.35% |
+| Regime | Trigger | Episodes | Avg Lock Duration | Mean Strategy Return During Stress |
+|---|---:|---:|---:|---:|
+| `FLAT_HIGH_RATE` | CREDIT | 1 | 357.0d | 16.03% |
+| `FLAT_HIGH_RATE` | VIX | 5 | 12.0d | -0.30% |
+| `FLAT_LOW_RATE` | CREDIT | 2 | 229.0d | 4.99% |
+| `FLAT_LOW_RATE` | VIX | 4 | 16.0d | 0.34% |
+| `INVERTED` | VIX | 4 | 14.2d | 0.73% |
+| `STEEP_HIGH_RATE` | CREDIT | 2 | 91.5d | 2.24% |
+| `STEEP_LOW_RATE` | CREDIT | 3 | 101.7d | 7.46% |
 
 Interpretation:
 
-- VIX lock mainly catches fast crash conditions; not every VIX spike is a profitable hedge episode.
-- Credit lock is strongest in `FLAT_HIGH_RATE`, where price-confirmed credit stress tends to be more damaging.
-- Commodity lock is the key fix for STEEP slow-growth stress, with clearly stronger drawdown-reduction evidence in `STEEP_HIGH_RATE` than in `STEEP_LOW_RATE`.
-- The same trigger can be effective in one regime and noisy in another.
-
-Core files:
-
-- `results/main_pipeline_final/tables/stress_entry_attribution.csv`
-- `results/main_pipeline_final/tables/trigger_effectiveness_summary.csv`
-- `results/main_pipeline_final/figures/stress_entry_timeline_by_trigger.png`
-- `results/main_pipeline_final/figures/trigger_regime_spy_timeline_long.png`
+- VIX now mainly handles fast panic in `FLAT` and `INVERTED`.
+- Credit is the main sustained-stress detector, including the new `STEEP` and `INVERTED` stress states.
+- The new state machine is cleaner than the prior commodity-trigger version, but still preserves differentiated hedge behavior through the allocation layer.
 
 ## 7. Regime x Stress Asset Behavior
 
-The most important empirical evidence is cross-state asset behavior.
-
 The final allocation is not assigned arbitrarily. It is derived from observed asset behavior under each regime-stress cross state.
 
-Summary:
+Main findings under the new state machine:
 
-- `FLAT_LOW_RATE_NORMAL`: SPY and commodities are strong. GOLD is removed from the normal pool.
-- `FLAT_LOW_RATE_STRESS`: GOLD has the strongest defensive profile.
-- `FLAT_HIGH_RATE_NORMAL`: GOLD and commodities dominate SPY. IEF is not included in the final normal pool.
-- `FLAT_HIGH_RATE_STRESS`: IEF performs best, with CASH used as a stabilizer.
-- `STEEP_LOW_RATE_NORMAL`: SPY is the return engine.
-- `STEEP_HIGH_RATE_NORMAL`: SPY remains useful, but CMDTY_FUT improves diversification and lowers the SPY-only drawdown profile.
-- `STEEP_FULL_RISK`: 30% GOLD / 70% IEF is used instead of a single hedge asset.
-- `INVERTED`: the final strategy keeps SPY / GOLD inverse-vol and does not force a full-risk state.
+- `FLAT_LOW_RATE_STRESS`: CASH dominates GOLD under the new stress sample.
+- `FLAT_HIGH_RATE_STRESS`: IEF remains the strongest hedge asset.
+- `STEEP_HIGH_RATE_NORMAL`: SPY, GOLD, and CMDTY_FUT are all strong, so a tri-asset inverse-vol sleeve is justified.
+- `STEEP_HIGH_RATE_STRESS`: IEF clearly dominates.
+- `STEEP_LOW_RATE_STRESS`: SPY still participates positively, but IEF materially improves path control; this motivates a mixed sleeve rather than a pure hedge.
+- `INVERTED_STRESS`: SPY and GOLD remain better than IEF, so the final stress sleeve keeps SPY/GOLD exposure and adds only a small CASH buffer.
 
 ![Cross-state asset return heatmap](../results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
 
@@ -170,30 +144,39 @@ Summary:
 | Macro Regime | State | Trigger Condition | Allocation | Rationale |
 |---|---|---|---|---|
 | `FLAT_LOW_RATE` | Normal | No active VIX or credit lock | SPY / CMDTY_FUT inverse-vol | Low-rate flat state can still reward equity and commodity exposure |
-| `FLAT_LOW_RATE` | Stress | VIX or credit lock active | 100% GOLD | Gold is the strongest defensive asset in this cross-state |
+| `FLAT_LOW_RATE` | Stress | VIX or credit lock active | 100% CASH | New stress sample is cleaner for cash than gold |
 | `FLAT_HIGH_RATE` | Normal | No active VIX or credit lock | GOLD / CMDTY_FUT inverse-vol | High-rate flat state favors real assets over SPY |
-| `FLAT_HIGH_RATE` | Stress | VIX or credit lock active | 90% IEF / 10% CASH | IEF has the best stress evidence; CASH stabilizes the hedge sleeve |
-| `STEEP_LOW_RATE` | Normal | No active VIX or commodity lock | 100% SPY | Low short-rate STEEP remains equity-friendly |
-| `STEEP_HIGH_RATE` | Normal | No active VIX or commodity lock | SPY / CMDTY_FUT inverse-vol | Higher short-rate STEEP benefits from commodity diversification |
-| `STEEP` | Full risk | VIX or commodity lock active | 30% GOLD / 70% IEF | Stress remains merged; IEF handles duration stress and GOLD diversifies commodity / inflation shock risk |
-| `INVERTED` | Normal only | No full-risk trigger enabled | SPY / GOLD inverse-vol | Inversion is not treated as automatic cash risk-off |
+| `FLAT_HIGH_RATE` | Stress | VIX or credit lock active | 100% IEF | IEF is the strongest stress hedge in this block |
+| `STEEP_LOW_RATE` | Normal | No active credit lock | 100% SPY | Low short-rate STEEP remains equity-friendly |
+| `STEEP_LOW_RATE` | Stress | Credit lock active | 60% SPY / 40% IEF | Stress is real, but SPY still participates positively |
+| `STEEP_HIGH_RATE` | Normal | No active credit lock | SPY / GOLD / CMDTY_FUT inverse-vol | Higher short-rate STEEP benefits from broader diversification |
+| `STEEP_HIGH_RATE` | Stress | Credit lock active | 10% CASH / 90% IEF | IEF is the dominant hedge, with a small cash stabilizer |
+| `INVERTED` | Normal | No active VIX or credit lock | SPY / GOLD inverse-vol | Inversion is not automatically risk-off |
+| `INVERTED` | Stress | VIX or credit lock active | 10% CASH + 90% (SPY / GOLD inverse-vol) | Stress still favors SPY/GOLD over IEF |
 
 ## 9. Backtest Results
 
 | Strategy | CAGR | Sharpe | Sortino | MaxDD | Calmar | Final Equity |
 |---|---:|---:|---:|---:|---:|---:|
 | SPY_BUY_HOLD | 11.14% | 0.575 | 0.702 | -55.19% | 0.202 | 8.38 |
-| SPY_CASH_TIMING | 12.04% | 0.948 | 1.101 | -29.45% | 0.409 | 9.86 |
-| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 20.20% | 1.492 | 2.013 | -15.94% | 1.267 | 40.61 |
+| SPY_CASH_TIMING | 13.45% | 1.223 | 1.347 | -14.60% | 0.921 | 12.69 |
+| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 19.73% | 1.660 | 2.125 | -11.58% | 1.704 | 37.54 |
 
 Compared with SPY buy-and-hold:
 
-- CAGR improves from 11.14% to 20.20%.
-- Sharpe improves from 0.575 to 1.492.
-- MaxDD falls from -55.19% to -15.94%.
-- Final equity improves from 8.38 to 40.61.
+- CAGR improves from 11.14% to 19.73%.
+- Sharpe improves from 0.575 to 1.660.
+- MaxDD falls from -55.19% to -11.58%.
+- Final equity improves from 8.38 to 37.54.
 
-The improvement is not from a single optimized trigger. It comes from the interaction of regime-specific triggers, trigger-lock stress episodes, regime-specific hedge allocation, and inverse-vol normal allocation.
+Compared with the new SPY/CASH timing benchmark:
+
+- CAGR improves from 13.45% to 19.73%.
+- Sharpe improves from 1.223 to 1.660.
+- MaxDD improves from -14.60% to -11.58%.
+- Final equity improves from 12.69 to 37.54.
+
+The improvement is not from a universal trigger. It comes from the interaction of regime-specific triggers, anchor-style stress periods, and regime-specific hedge sleeves.
 
 ![Final equity curve](../results/main_pipeline_final/figures/final_equity_curve_comparison.png)
 
@@ -201,17 +184,15 @@ The improvement is not from a single optimized trigger. It comes from the intera
 
 ![Final performance bars](../results/main_pipeline_final/figures/final_performance_bar_charts.png)
 
-![Final weight timeline](../results/main_pipeline_final/figures/final_strategy_weights_timeline.png)
-
 ## 10. Crisis Window Analysis
 
-| Window | Main Stress Type | Trigger / State | Hedge Behavior | Result |
-|---|---|---|---|---|
-| 2008 GFC | Credit and broad risk stress | FLAT_HIGH credit, later STEEP commodity lock | IEF / GOLD hedge exposure avoided the largest equity damage | Final +54.73%, SPY -37.16% |
-| 2015-2016 | Commodity / growth stress | STEEP commodity lock | GOLD / IEF hedge repaired the original missed slow-growth stress | Final +14.43%, MaxDD -6.29% |
-| COVID 2020 | Fast volatility shock | FLAT_LOW VIX / credit locks | GOLD helped, though fast SPY recovery created opportunity cost | Final +27.41%, MaxDD -15.50% |
-| 2022 rate / inflation / war shock | Rate shock and inflation stress | STEEP / FLAT locks | Regime-specific hedge sleeves beat SPY and SPY/CASH timing | Final +6.60%, MaxDD -14.09% |
-| 2025 pullback | High-rate volatility stress | FLAT_HIGH VIX lock | IEF / CASH stress sleeve reduced drawdown | Final +19.99%, MaxDD -7.79% |
+| Window | Main Stress Type | Final Strategy Result | Comment |
+|---|---|---:|---|
+| 2008 GFC | Sustained credit crisis | +39.08%, MaxDD -5.54% | New credit lock kept the strategy defensive through the deepest phase |
+| 2015-2016 | Slow-growth / commodity stress spillover | +4.88%, MaxDD -5.61% | Less upside than older commodity-trigger variants, but still controlled |
+| COVID 2020 | Fast volatility shock | +17.92%, MaxDD -11.09% | VIX handled the fast spike while the hedge sleeve preserved most of the rebound |
+| 2022 rate / inflation / war shock | Stair-step elevated credit stress | +20.72%, MaxDD -10.29% | This is the clearest beneficiary of the new credit state machine |
+| 2025 pullback | High-rate volatility stress | +19.24%, MaxDD -8.35% | Strong drawdown control without major opportunity cost |
 
 Case studies:
 
@@ -225,15 +206,15 @@ Case studies:
 
 ## 11. Trigger and Turnover Diagnostics
 
-The final stress system is not optimized to minimize turnover. Turnover is mainly caused by full-risk entry and unlock events, not by inverse-vol rebalance.
+The new state machine reduces conceptual complexity even though it still trades actively enough to maintain stress control.
 
 Diagnostic summary:
 
-- Total full-risk entries: 35.
-- Total full-risk exits: 35.
-- Top turnover events are full-risk unlock exits and VIX entries.
-- `STEEP -> STEEP` turnover is mostly internal transition between `STEEP_LOW_RATE_NORMAL`, `STEEP_HIGH_RATE_NORMAL`, and `STEEP_FULL_RISK`.
-- Recovery overlay is not part of the final mainline.
+- Total full-risk entries: 21
+- Total full-risk exits: 21
+- Top turnover events remain full-risk unlock exits and VIX / credit entries.
+- `SPY_CASH_TIMING` and the final hedge strategy now share the same anchor stress definition.
+- Commodity-trigger turnover is gone from the mainline.
 
 Relevant figures:
 
@@ -246,53 +227,34 @@ Relevant figures:
 ## 12. Methodology Notes
 
 - The mainline is source-only and uses `data/raw` and `data/processed`.
-- It does not depend on old validated or exploratory result folders.
 - Signal day `t` affects position on day `t+1`.
 - Regime confirmation requires 3 consecutive days.
-- FLAT low/high uses rounded `GS10 = 3.0`.
+- FLAT low/high uses `GS10 = 3.0`.
 - STEEP low/high uses `GS1 = 0.3` with 3-day confirmation.
 - There is no `NEUTRAL` regime and no fallback allocation.
-- Inverse-volatility uses a 90 trading day window. A light grid search across reasonable windows showed only limited performance sensitivity, so the final mainline keeps 90.
+- Inverse-volatility uses a 90 trading day window.
 - Transaction cost is 10 bps one-way.
 - CASH uses compounded daily DTB3.
-- Credit spread uses WBAA - WAAA.
-- Final credit-lock logic uses `D_CREDIT_SPREAD_15D`.
-- VIX z-score uses a 120 trading day rolling window, current-day inclusive, `ddof=1`.
-- No look-ahead data is used for strategy generation.
-
-Run order:
-
-```bash
-python scripts/01_data_prepare.py
-python scripts/02_rule_based_regime.py
-python scripts/03_stress_detection.py
-python scripts/04_asset_return_panel.py
-python scripts/05_baseline_strategy.py
-python scripts/06_flat_rate_refined_strategy.py
-python scripts/07_cross_state_asset_behavior.py
-python scripts/08_stress_trigger_diagnostics.py
-python scripts/09_final_strategy_recovery_flat_low_only.py
-python scripts/10_final_report_outputs.py
-```
-
-The name `09_final_strategy_recovery_flat_low_only.py` is historical. It now outputs the trigger-lock final strategy.
+- Credit spread uses daily `DBAA - DAAA`, aligned to the trading calendar before feature construction.
+- Credit unlock requires `CREDIT_LEVEL_Z_252D < 0.9`.
+- Commodity trigger is not part of the final mainline.
 
 ## 13. Limitations
 
-- Stress events are sparse and heterogeneous.
-- Commodity proxy choice affects commodity-trigger timing.
-- Macro data may be revised or published with delay.
-- Trigger-lock thresholds require out-of-sample validation.
+- Stress windows are sparse and heterogeneous.
+- Daily credit data still requires careful missing-value handling and publication awareness.
+- The anchor-exit state machine is economically motivated, but still tuned in-sample.
+- `STEEP_LOW_RATE_STRESS` and `INVERTED_STRESS` are newer states and need more OOS evidence.
 - The strategy remains SPY-centered, not minimum-volatility.
 - Regime thresholds are economically motivated but still simplified.
-- The strategy is research code and not financial advice.
+- This is not financial advice.
 
 ## 14. Final Interpretation
 
 The main contribution is not a single optimized trigger. The main contribution is a regime-conditioned framework showing that both stress detection and hedge allocation depend on the macro regime.
 
-The final strategy shows that:
+The current mainline reflects that idea more cleanly than the previous version:
 
-- VIX, credit, and commodity stress do not have the same meaning in every regime.
-- GOLD, IEF, CASH, commodities, and SPY do not have fixed roles across regimes.
-- A regime-aware trigger-lock state machine can preserve equity participation while materially reducing major drawdowns.
+- stress timing is handled by a simpler VIX/CREDIT anchor state machine,
+- `SPY_CASH_TIMING` is materially stronger than before,
+- and the final hedge strategy preserves that timing improvement while lowering drawdown further through regime-specific sleeves.

@@ -22,8 +22,8 @@ SOURCE_INPUTS = {
     "dgs1": ROOT / "data" / "raw" / "macro" / "rate" / "DGS1.csv",
     "dtb3": ROOT / "data" / "raw" / "macro" / "rate" / "DTB3.csv",
     "vix": ROOT / "data" / "raw" / "macro" / "volatility" / "VIXCLS.csv",
-    "waaa": ROOT / "data" / "raw" / "macro" / "Credit" / "WAAA.csv",
-    "wbaa": ROOT / "data" / "raw" / "macro" / "Credit" / "WBAA.csv",
+    "waaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DAAA.csv",
+    "wbaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DBAA.csv",
 }
 
 ASSETS = ["SPY", "GOLD", "CMDTY_FUT", "IEF", "CASH"]
@@ -46,6 +46,7 @@ RECOVERY_WINDOW = 20
 TRIGGER_LOCK_CREDIT_WINDOW = 15
 TRIGGER_LOCK_CREDIT_ENTRY_THRESHOLD = 0.10
 TRIGGER_LOCK_CREDIT_EXIT_THRESHOLD = 0.0
+TRIGGER_LOCK_CREDIT_LEVEL_Z_EXIT_THRESHOLD = 0.9
 
 
 def rel(path: Path) -> str:
@@ -138,8 +139,8 @@ def build_source_panel() -> pd.DataFrame:
     dgs1 = read_fred_series(SOURCE_INPUTS["dgs1"], "DGS1")
     dtb3 = read_fred_series(SOURCE_INPUTS["dtb3"], "DTB3")
     vix = read_fred_series(SOURCE_INPUTS["vix"], "VIXCLS").rename(columns={"VIXCLS": "VIX_LEVEL"})
-    waaa = read_fred_series(SOURCE_INPUTS["waaa"], "WAAA")
-    wbaa = read_fred_series(SOURCE_INPUTS["wbaa"], "WBAA")
+    waaa = read_fred_series(SOURCE_INPUTS["waaa"], "DAAA").rename(columns={"DAAA": "WAAA"})
+    wbaa = read_fred_series(SOURCE_INPUTS["wbaa"], "DBAA").rename(columns={"DBAA": "WBAA"})
 
     panel = prices[["date", "SPY"]].rename(columns={"SPY": "spy_price"}).copy()
     for out_col, src_col in ASSET_RETURN_MAP.items():
@@ -151,7 +152,7 @@ def build_source_panel() -> pd.DataFrame:
     panel = panel.sort_values("date").drop_duplicates("date").reset_index(drop=True)
 
     for col in ["DGS10", "DGS1", "DTB3", "VIX_LEVEL", "WAAA", "WBAA"]:
-        panel[col] = pd.to_numeric(panel[col], errors="coerce").ffill()
+        panel[col] = pd.to_numeric(panel[col], errors="coerce").ffill().bfill()
 
     panel["GS10"] = panel["DGS10"]
     panel["GS1"] = panel["DGS1"]
@@ -166,11 +167,18 @@ def build_source_panel() -> pd.DataFrame:
 
     panel["spy_drawdown_from_previous_high"] = panel["spy_price"] / panel["spy_price"].cummax() - 1.0
     panel["SPY_MA20"] = panel["spy_price"].rolling(20, min_periods=20).mean()
+    panel["SPY_MA50"] = panel["spy_price"].rolling(50, min_periods=50).mean()
     panel["SPY_CROSS_ABOVE_MA20"] = (panel["spy_price"] > panel["SPY_MA20"]) & (
         panel["spy_price"].shift(1) <= panel["SPY_MA20"].shift(1)
     )
+    panel["SPY_above_MA20"] = panel["spy_price"] > panel["SPY_MA20"]
+    panel["SPY_above_MA50"] = panel["spy_price"] > panel["SPY_MA50"]
     vix_roll = panel["VIX_LEVEL"].rolling(120, min_periods=120)
     panel["VIX_ZSCORE_120D"] = (panel["VIX_LEVEL"] - vix_roll.mean()) / vix_roll.std(ddof=1).replace(0, np.nan)
+    credit_roll = panel["CREDIT_SPREAD_BAA_AAA"].rolling(252, min_periods=126)
+    panel["CREDIT_LEVEL_Z_252D"] = (
+        (panel["CREDIT_SPREAD_BAA_AAA"] - credit_roll.mean()) / credit_roll.std(ddof=1).replace(0, np.nan)
+    )
 
     cmdty_price = (1.0 + panel["CMDTY_FUT_return"].fillna(0.0)).cumprod()
     panel["CMDTY_FUT_price"] = cmdty_price
@@ -387,53 +395,59 @@ def apply_flat_low_recovery(df: pd.DataFrame, base_weights: pd.DataFrame, base_s
 
 def normal_allocation_by_regime(
     i: int,
-    refined: str,
-    steep_rate: str,
+    final_regime: str,
     flat_low_normal: pd.DataFrame,
     flat_high_normal: pd.DataFrame,
     steep_high_normal: pd.DataFrame,
     inverted_normal: pd.DataFrame,
 ) -> tuple[dict[str, float], str]:
-    if refined == "FLAT_LOW_RATE":
+    if final_regime == "FLAT_LOW_RATE":
         return flat_low_normal.loc[i].to_dict(), "FLAT_LOW_RATE_NORMAL"
-    if refined == "FLAT_HIGH_RATE":
+    if final_regime == "FLAT_HIGH_RATE":
         return flat_high_normal.loc[i].to_dict(), "FLAT_HIGH_RATE_NORMAL"
-    if refined == "STEEP":
-        if steep_rate == "STEEP_HIGH_RATE":
-            return steep_high_normal.loc[i].to_dict(), "STEEP_HIGH_RATE_NORMAL"
+    if final_regime == "STEEP_HIGH_RATE":
+        return steep_high_normal.loc[i].to_dict(), "STEEP_HIGH_RATE_NORMAL"
+    if final_regime == "STEEP_LOW_RATE":
         return {"SPY": 1.0}, "STEEP_LOW_RATE_NORMAL"
-    if refined == "INVERTED":
-        return inverted_normal.loc[i].to_dict(), "INVERTED"
-    raise ValueError(f"Unexpected refined regime: {refined}")
+    if final_regime == "INVERTED":
+        return inverted_normal.loc[i].to_dict(), "INVERTED_NORMAL"
+    raise ValueError(f"Unexpected final regime: {final_regime}")
 
 
-def stress_allocation_by_regime(refined: str) -> tuple[dict[str, float], str]:
-    if refined == "FLAT_LOW_RATE":
-        return {"GOLD": 1.0}, "FLAT_LOW_RATE_STRESS"
-    if refined == "FLAT_HIGH_RATE":
-        return {"IEF": 0.90, "CASH": 0.10}, "FLAT_HIGH_RATE_STRESS"
-    if refined == "STEEP":
-        return {"GOLD": 0.30, "IEF": 0.70}, "STEEP_FULL_RISK"
-    raise ValueError(f"Unexpected refined regime: {refined}")
+def stress_allocation_by_regime(
+    i: int,
+    final_regime: str,
+    inverted_normal: pd.DataFrame,
+) -> tuple[dict[str, float], str]:
+    if final_regime == "FLAT_LOW_RATE":
+        return {"CASH": 1.0}, "FLAT_LOW_RATE_STRESS"
+    if final_regime == "FLAT_HIGH_RATE":
+        return {"IEF": 1.0}, "FLAT_HIGH_RATE_STRESS"
+    if final_regime == "STEEP_LOW_RATE":
+        return {"SPY": 0.60, "IEF": 0.40}, "STEEP_LOW_RATE_STRESS"
+    if final_regime == "STEEP_HIGH_RATE":
+        return {"CASH": 0.10, "IEF": 0.90}, "STEEP_HIGH_RATE_STRESS"
+    if final_regime == "INVERTED":
+        base = inverted_normal.loc[i].to_dict()
+        scaled = {asset: 0.90 * float(weight) for asset, weight in base.items()}
+        scaled["CASH"] = scaled.get("CASH", 0.0) + 0.10
+        return scaled, "INVERTED_STRESS"
+    raise ValueError(f"Unexpected final regime: {final_regime}")
 
 
 def allowed_trigger_locks(row: pd.Series) -> set[str]:
-    refined = row["refined_regime_confirmed"]
+    regime = row["final_regime_confirmed"]
     locks: set[str] = set()
     vix_entry = bool(row["VIX_ZSCORE_120D"] >= 3.0)
     credit_entry = bool(
         (row["spy_drawdown_from_previous_high"] <= -0.05)
         and (row["D_CREDIT_SPREAD_15D"] > TRIGGER_LOCK_CREDIT_ENTRY_THRESHOLD)
+        and (not bool(row["SPY_above_MA20"]))
     )
-    cmdty_entry = bool(row["CMDTY_RET60"] < -0.10)
-    if refined == "STEEP":
+    if regime in {"FLAT_LOW_RATE", "FLAT_HIGH_RATE", "INVERTED"}:
         if vix_entry:
             locks.add("VIX")
-        if cmdty_entry:
-            locks.add("CMDTY")
-    elif refined in {"FLAT_LOW_RATE", "FLAT_HIGH_RATE"}:
-        if vix_entry:
-            locks.add("VIX")
+    if regime in {"FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_HIGH_RATE", "INVERTED"}:
         if credit_entry:
             locks.add("CREDIT")
     return locks
@@ -441,18 +455,18 @@ def allowed_trigger_locks(row: pd.Series) -> set[str]:
 
 def unlock_trigger_locks(row: pd.Series, active_locks: set[str]) -> set[str]:
     unlocked: set[str] = set()
-    spy_above_ma20 = bool(row["spy_price"] > row["SPY_MA20"])
+    spy_above_ma20 = bool(row["SPY_above_MA20"])
     vix_unlock = bool((row["VIX_ZSCORE_120D"] < 1.5) and spy_above_ma20)
-    credit_unlock = bool((row["D_CREDIT_SPREAD_15D"] < TRIGGER_LOCK_CREDIT_EXIT_THRESHOLD) and spy_above_ma20)
-    cmdty_unlock = bool((row["CMDTY_RET60"] > -0.05) and spy_above_ma20)
+    credit_unlock = bool(
+        bool(row["SPY_above_MA50"])
+        and (row["D_CREDIT_SPREAD_15D"] < TRIGGER_LOCK_CREDIT_EXIT_THRESHOLD)
+        and pd.notna(row["CREDIT_LEVEL_Z_252D"])
+        and (row["CREDIT_LEVEL_Z_252D"] < TRIGGER_LOCK_CREDIT_LEVEL_Z_EXIT_THRESHOLD)
+    )
     if "VIX" in active_locks and vix_unlock:
         unlocked.add("VIX")
-        if "CREDIT" in active_locks:
-            unlocked.add("CREDIT")
     if "CREDIT" in active_locks and credit_unlock:
         unlocked.add("CREDIT")
-    if "CMDTY" in active_locks and cmdty_unlock:
-        unlocked.add("CMDTY")
     return unlocked
 
 
@@ -461,85 +475,124 @@ def build_trigger_lock_final_weights(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     flat_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
     flat_high_normal = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
-    steep_high_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    steep_high_normal = monthly_hold_weights(df, ["SPY", "GOLD", "CMDTY_FUT"], window=inv_vol_window)
     inverted_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
     weights = pd.DataFrame(0.0, index=df.index, columns=ASSETS)
 
-    current_full_risk = False
-    current_locks: set[str] = set()
-    pending_full_risk = False
-    pending_locks: set[str] = set()
+    pending_vix = False
+    pending_credit = False
+    pending_anchor = ""
     rows = []
 
     for i, row in df.iterrows():
-        current_full_risk = pending_full_risk
-        current_locks = set(pending_locks)
-        refined = row["refined_regime_confirmed"]
+        current_vix = pending_vix
+        current_credit = pending_credit
+        current_anchor = pending_anchor
+        current_full_risk = current_vix or current_credit or bool(current_anchor)
+        current_locks = {name for name, flag in [("VIX", current_vix), ("CREDIT", current_credit)] if flag}
+        final_regime = row["final_regime_confirmed"]
 
         lock_added_today: set[str] = set()
         lock_unlocked_today: set[str] = set()
         entry_signal = False
         exit_signal = False
 
+        vix_ent = "VIX" in allowed_trigger_locks(row)
+        credit_ent = "CREDIT" in allowed_trigger_locks(row)
+        unlocked = unlock_trigger_locks(row, current_locks)
+        vix_unl = "VIX" in unlocked
+        credit_unl = "CREDIT" in unlocked
+
+        next_vix = current_vix
+        next_credit = current_credit
+        next_anchor = current_anchor
+
         if current_full_risk:
-            if refined == "INVERTED":
-                w, allocation_state = normal_allocation_by_regime(
-                    i,
-                    refined,
-                    row["steep_rate_regime_confirmed"],
-                    flat_low_normal,
-                    flat_high_normal,
-                    steep_high_normal,
-                    inverted_normal,
-                )
+            w, allocation_state = stress_allocation_by_regime(i, final_regime, inverted_normal)
+
+            if not current_anchor:
+                current_anchor = "BOTH" if current_vix and current_credit else "VIX" if current_vix else "CREDIT" if current_credit else ""
+
+            if vix_ent and not current_vix:
+                next_vix = True
+                lock_added_today.add("VIX")
+            if credit_ent and not current_credit:
+                next_credit = True
+                lock_added_today.add("CREDIT")
+
+            if current_anchor == "VIX":
+                if vix_unl:
+                    next_anchor = ""
+                    next_vix = False
+                    next_credit = False
+                    lock_unlocked_today.update({"VIX"} | ({"CREDIT"} if current_credit else set()))
+            elif current_anchor == "CREDIT":
+                if credit_unl:
+                    next_anchor = ""
+                    next_vix = False
+                    next_credit = False
+                    lock_unlocked_today.update({"CREDIT"} | ({"VIX"} if current_vix else set()))
             else:
-                w, allocation_state = stress_allocation_by_regime(refined)
-            new_locks = allowed_trigger_locks(row) - current_locks
-            current_locks |= new_locks
-            lock_added_today = set(new_locks)
-            unlocks = unlock_trigger_locks(row, current_locks)
-            current_locks -= unlocks
-            lock_unlocked_today = set(unlocks)
-            if not current_locks:
+                if current_vix and vix_unl:
+                    next_vix = False
+                    lock_unlocked_today.add("VIX")
+                if current_credit and credit_unl:
+                    next_credit = False
+                    lock_unlocked_today.add("CREDIT")
+                if not next_vix and not next_credit:
+                    next_anchor = ""
+
+            pending_vix = next_vix
+            pending_credit = next_credit
+            pending_anchor = next_anchor
+            if not pending_vix and not pending_credit and not pending_anchor:
                 exit_signal = True
-                pending_full_risk = False
-                pending_locks = set()
-            else:
-                pending_full_risk = True
-                pending_locks = set(current_locks)
         else:
             w, allocation_state = normal_allocation_by_regime(
                 i,
-                refined,
-                row["steep_rate_regime_confirmed"],
+                final_regime,
                 flat_low_normal,
                 flat_high_normal,
                 steep_high_normal,
                 inverted_normal,
             )
-            new_locks = allowed_trigger_locks(row)
-            if new_locks:
+            if vix_ent and credit_ent:
                 entry_signal = True
-                lock_added_today = set(new_locks)
-                pending_full_risk = True
-                pending_locks = set(new_locks)
+                lock_added_today.update({"VIX", "CREDIT"})
+                pending_vix = True
+                pending_credit = True
+                pending_anchor = "BOTH"
+            elif vix_ent:
+                entry_signal = True
+                lock_added_today.add("VIX")
+                pending_vix = True
+                pending_credit = False
+                pending_anchor = "VIX"
+            elif credit_ent:
+                entry_signal = True
+                lock_added_today.add("CREDIT")
+                pending_vix = False
+                pending_credit = True
+                pending_anchor = "CREDIT"
             else:
-                pending_full_risk = False
-                pending_locks = set()
+                pending_vix = False
+                pending_credit = False
+                pending_anchor = ""
 
         weights.loc[i, ASSETS] = pd.Series(normalize_weight_dict(w))
         rows.append(
             {
                 "trigger_lock_full_risk_state": "FULL_RISK" if current_full_risk else "NON_RISK",
                 "trigger_lock_active_locks": "+".join(sorted(current_locks)),
+                "trigger_lock_anchor_state": current_anchor,
                 "trigger_lock_locks_added_today": "+".join(sorted(lock_added_today)),
                 "trigger_lock_locks_unlocked_today": "+".join(sorted(lock_unlocked_today)),
                 "trigger_lock_entry_signal": entry_signal,
                 "trigger_lock_exit_signal": exit_signal,
                 "final_allocation_state": allocation_state,
-                "trigger_lock_vix_entry_condition": "VIX" in allowed_trigger_locks(row),
-                "trigger_lock_credit_entry_condition": "CREDIT" in allowed_trigger_locks(row),
-                "trigger_lock_cmdty_entry_condition": "CMDTY" in allowed_trigger_locks(row),
+                "trigger_lock_vix_entry_condition": vix_ent,
+                "trigger_lock_credit_entry_condition": credit_ent,
+                "trigger_lock_cmdty_entry_condition": False,
             }
         )
 

@@ -245,14 +245,14 @@ The canonical final strategy uses a trigger-lock state machine. This replaced th
 
 ### Trigger Rules Summary
 
-- `STEEP`: VIX trigger and commodity trigger are active.
-- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE`: VIX trigger and credit drawdown trigger are active.
-- `INVERTED`: no full-risk trigger is active.
-- Monthly SELL is no longer part of the final state machine.
-- Credit entry uses `D_CREDIT_SPREAD_15D > 0.10` with `SPY drawdown <= -5%`.
-- Credit unlock uses `D_CREDIT_SPREAD_15D < 0` and `SPY > MA20`.
-- VIX unlock uses `VIX_ZSCORE_120D < 1.5`; if VIX and CREDIT locks are both active, VIX unlock also unlocks CREDIT.
-- Commodity unlock uses `CMDTY_RET60 > -5%` and `SPY > MA20`.
+- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `INVERTED`: VIX trigger is active.
+- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `STEEP_LOW_RATE` / `STEEP_HIGH_RATE` / `INVERTED`: credit trigger is active.
+- Commodity trigger is not part of the final mainline.
+- Monthly SELL is not part of the final state machine.
+- Credit entry uses `D_CREDIT_SPREAD_15D > 0.10`, `SPY drawdown <= -5%`, and `SPY <= MA20`.
+- Credit unlock uses `D_CREDIT_SPREAD_15D < 0`, `SPY > MA50`, and `CREDIT_LEVEL_Z_252D < 0.9`.
+- VIX unlock uses `VIX_ZSCORE_120D < 1.5` with `SPY > MA20`.
+- The anchor-exit rule means VIX-led stress exits on VIX unlock, credit-led stress exits on credit unlock, and BOTH entries unlock independently.
 
 ### Key Findings
 
@@ -262,7 +262,7 @@ The canonical final strategy uses a trigger-lock state machine. This replaced th
 
 ### Implication
 
-Future research can still study state-machine refinements, but the current mainline is intentionally converged around the credit15 trigger-lock version without recovery overlay or parameter search.
+Future research can still study state-machine refinements, but the current mainline is intentionally converged around the VIX/CREDIT anchor state machine without recovery overlay or commodity-trigger complexity.
 """
 
 
@@ -270,12 +270,7 @@ def main() -> None:
     ensure_dirs()
     panel, perf = build_final_source_only_panel()
     stress_flag = panel["final_state"].eq("FULL_RISK")
-    panel["allocation_cross_state"] = panel["final_allocation_state"].replace(
-        {
-            "STEEP_FULL_RISK": "STEEP_STRESS",
-            "INVERTED": "INVERTED_NORMAL",
-        }
-    )
+    panel["allocation_cross_state"] = panel["final_allocation_state"]
     panel["final_regime_cross_state"] = panel["final_regime_confirmed"] + "_" + stress_flag.map(
         {True: "STRESS", False: "NORMAL"}
     )
@@ -345,11 +340,11 @@ canonical source-only settings.
 Final display strategies:
 
 - `SPY_BUY_HOLD`: always 100% SPY.
-- `SPY_CASH_TIMING`: SPY in non-risk, CASH in full-risk; uses the full stress entry / R3 exit backbone, no hedge assets.
+- `SPY_CASH_TIMING`: SPY in non-risk, CASH in full-risk; uses the same VIX/CREDIT anchor stress state as the final hedge strategy.
 - `FINAL_REGIME_HEDGE_TRIGGER_LOCK`: final hedge allocation with inverse-vol normal allocations and regime-specific trigger-lock stress hedges.
 
 Key design choices:
-- Credit spread is raw `WBAA - WAAA`, forward-filled to trading days.
+- Credit spread is daily `DBAA - DAAA`, filled to the trading calendar before feature construction.
 - Macro regime has no `NEUTRAL`: term spread maps every day to `INVERTED`,
   `FLAT`, or `STEEP`, then uses 3-day confirmation.
 - FLAT is refined with GS10 threshold 3.0 into `FLAT_LOW_RATE` and
@@ -365,13 +360,15 @@ Key design choices:
 
 Final allocation settings:
 - `FLAT_LOW_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
-- `FLAT_LOW_RATE_STRESS`: 100% GOLD.
+- `FLAT_LOW_RATE_STRESS`: 100% CASH.
 - `FLAT_HIGH_RATE_NORMAL`: GOLD / CMDTY_FUT inverse-vol.
-- `FLAT_HIGH_RATE_STRESS`: 90% IEF / 10% CASH.
+- `FLAT_HIGH_RATE_STRESS`: 100% IEF.
 - `STEEP_LOW_RATE_NORMAL`: 100% SPY.
-- `STEEP_HIGH_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
-- `STEEP_FULL_RISK`: 30% GOLD / 70% IEF.
-- `INVERTED`: SPY / GOLD inverse-vol.
+- `STEEP_LOW_RATE_STRESS`: 60% SPY / 40% IEF.
+- `STEEP_HIGH_RATE_NORMAL`: SPY / GOLD / CMDTY_FUT inverse-vol.
+- `STEEP_HIGH_RATE_STRESS`: 10% CASH / 90% IEF.
+- `INVERTED_NORMAL`: SPY / GOLD inverse-vol.
+- `INVERTED_STRESS`: 10% CASH + 90% (SPY / GOLD inverse-vol).
 
 How to run the current main sequence:
 
@@ -383,7 +380,7 @@ How to run the current main sequence:
 6. `python scripts/06_flat_rate_refined_strategy.py`
 7. `python scripts/07_cross_state_asset_behavior.py`
 8. `python scripts/08_stress_trigger_diagnostics.py`
-9. `python scripts/09_final_strategy_recovery_flat_low_only.py`
+9. `python scripts/run_final_strategy_source_only.py`
 10. `python scripts/10_final_report_outputs.py`
 """
     readme += stress_trigger_readme_section()
