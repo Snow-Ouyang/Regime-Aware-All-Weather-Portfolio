@@ -8,7 +8,7 @@ Final strategies:
 |---|---:|---:|---:|---:|---:|---:|
 | SPY_BUY_HOLD | 11.14% | 0.575 | 0.702 | -55.19% | 0.202 | 8.38 |
 | SPY_CASH_TIMING | 14.09% | 1.280 | 1.420 | -14.60% | 0.965 | 14.22 |
-| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 21.98% | 1.789 | 2.285 | -12.49% | 1.759 | 54.62 |
+| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 22.20% | 1.808 | 2.303 | -12.49% | 1.776 | 56.61 |
 
 This is now the canonical source-only mainline.
 
@@ -117,7 +117,10 @@ The first trigger that starts stress is the anchor trigger for exit.
 Mainline heatmap outputs:
 - [cross-state return heatmap](../results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
 - [cross-state Sharpe heatmap](../results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
+- [pure regime-stress return heatmap](../results/main_pipeline_final/figures/pure_regime_stress_asset_behavior_heatmap.png)
+- [pure regime-stress Sharpe heatmap](../results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png)
 - [cross-state asset table](../results/main_pipeline_final/tables/cross_state_asset_behavior.csv)
+- [pure regime-stress asset table](../results/main_pipeline_final/tables/pure_cross_state_asset_behavior.csv)
 
 Final heatmap buckets:
 - `FLAT_LOW_RATE_NORMAL`
@@ -135,7 +138,7 @@ Final heatmap buckets:
 
 Important handling:
 - `FLAT_LOW_RATE_STRESS` and `FLAT_MID_RATE_STRESS` are merged into `FLAT_LOWMID_RATE_STRESS`.
-- `STEEP_LOW_RATE_STRESS` is not drawn as a separate heatmap bucket because there is no native trigger there. Any such days are carry-over, but they still remain on a stress sleeve until unlock.
+- `STEEP_LOW_RATE_STRESS` is omitted from the allocation-state heatmap because it is carry-over only, but it is included in the pure `regime x stress` heatmap so its stress asset behavior is explicit.
 
 Current sample sizes:
 - `FLAT_LOW_RATE_NORMAL`: `193`
@@ -164,7 +167,7 @@ Current sample sizes:
 | `STEEP_LOW_RATE_STRESS` | `100% SPY` |
 | `STEEP_MID_RATE_NORMAL` | `100% SPY` |
 | `STEEP_MID_RATE_STRESS` | `100% IEF` |
-| `STEEP_HIGH_RATE_NORMAL` | `SPY + GOLD + CMDTY_FUT` inverse-vol |
+| `STEEP_HIGH_RATE_NORMAL` | `70% GOLD + 30% (SPY + CMDTY_FUT inverse-vol)` |
 | `STEEP_HIGH_RATE_STRESS` | `100% IEF` |
 | `INVERTED_NORMAL` | `SPY + GOLD` inverse-vol |
 | `INVERTED_STRESS` | `10% CASH + 90% (SPY + GOLD inverse-vol)` |
@@ -173,8 +176,8 @@ Current sample sizes:
 
 | Window | SPY_CASH_TIMING | FINAL_REGIME_HEDGE_TRIGGER_LOCK |
 |---|---:|---:|
-| 2008_GFC | `+7.40%`, MaxDD `-8.17%` | `+44.42%`, MaxDD `-6.18%` |
-| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+18.06%`, MaxDD `-9.54%` |
+| 2008_GFC | `+7.40%`, MaxDD `-8.17%` | `+42.56%`, MaxDD `-6.18%` |
+| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+20.05%`, MaxDD `-9.54%` |
 | 2015_2016 | `+3.24%`, MaxDD `-3.32%` | `+17.18%`, MaxDD `-5.70%` |
 | COVID_2020 | `+17.01%`, MaxDD `-6.99%` | `+20.59%`, MaxDD `-10.41%` |
 | 2022_RATE_WAR | `+3.79%`, MaxDD `-9.73%` | `+14.80%`, MaxDD `-10.29%` |

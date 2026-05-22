@@ -404,7 +404,7 @@ def build_trigger_lock_final_weights(df: pd.DataFrame, inv_vol_window: int = INV
     flat_high_normal = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
     flat_high_stress_gc = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
     steep_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
-    steep_high_normal = monthly_hold_weights(df, ["SPY", "GOLD", "CMDTY_FUT"], window=inv_vol_window)
+    steep_high_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
     inverted_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
 
     weights = pd.DataFrame(0.0, index=df.index, columns=ASSETS)
@@ -489,6 +489,8 @@ def build_trigger_lock_final_weights(df: pd.DataFrame, inv_vol_window: int = INV
                 steep_high_normal,
                 inverted_normal,
             )
+            if final_regime == "STEEP_HIGH_RATE":
+                w = mixed_inv_vol_row(w, {"GOLD": 0.70})
             if vix_ent and credit_ent:
                 entry_signal = True
                 lock_added_today.update({"VIX", "CREDIT"})

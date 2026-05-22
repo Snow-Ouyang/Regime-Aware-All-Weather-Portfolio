@@ -23,7 +23,7 @@ Key design choices:
   - `HIGH -> MID = 3.0`
   - `MID -> HIGH = 3.2`
 - `STEEP_LOW_RATE` does not allow native credit entries.
-- If a `FULL_RISK` episode carries into a new regime, the strategy stays on a stress sleeve until unlock. Carry-over may adopt the new regime's stress sleeve, but it cannot revert to normal during `FULL_RISK`.
+- Carry-over stress is shown explicitly in the cross-state heatmap. `STEEP_LOW_RATE_STRESS` has no native trigger, but if an active stress period carries into `STEEP_LOW_RATE`, it remains a stress sleeve and is analyzed separately.
 - `CASH_return` uses geometric daily DTB3.
 - Inverse-vol window is 90 trading days.
 - Transaction cost uses 10 bps one-way.
@@ -39,10 +39,16 @@ Final allocation settings:
 - `STEEP_LOW_RATE_STRESS`: 100% SPY.
 - `STEEP_MID_RATE_NORMAL`: 100% SPY.
 - `STEEP_MID_RATE_STRESS`: 100% IEF.
-- `STEEP_HIGH_RATE_NORMAL`: SPY / GOLD / CMDTY_FUT inverse-vol.
+- `STEEP_HIGH_RATE_NORMAL`: 70% GOLD + 30% (SPY / CMDTY_FUT inverse-vol).
 - `STEEP_HIGH_RATE_STRESS`: 100% IEF.
 - `INVERTED_NORMAL`: SPY / GOLD inverse-vol.
 - `INVERTED_STRESS`: 10% CASH + 90% (SPY / GOLD inverse-vol).
+
+Pure regime x stress outputs are also written into the mainline output set:
+
+- `results/main_pipeline_final/figures/pure_regime_stress_asset_behavior_heatmap.png`
+- `results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png`
+- `results/main_pipeline_final/tables/pure_cross_state_asset_behavior.csv`
 
 Main run order:
 

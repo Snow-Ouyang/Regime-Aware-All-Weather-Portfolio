@@ -25,6 +25,7 @@ STATE_ORDER = [
     "FLAT_HIGH_RATE_NORMAL",
     "FLAT_HIGH_RATE_STRESS",
     "STEEP_LOW_RATE_NORMAL",
+    "STEEP_LOW_RATE_STRESS",
     "STEEP_MID_RATE_NORMAL",
     "STEEP_MID_RATE_STRESS",
     "STEEP_HIGH_RATE_NORMAL",
@@ -32,6 +33,7 @@ STATE_ORDER = [
     "INVERTED_NORMAL",
     "INVERTED_STRESS",
 ]
+PURE_STATE_ORDER = STATE_ORDER
 
 
 def ensure_dirs() -> None:
@@ -73,13 +75,21 @@ def heatmap_cross_state(row: pd.Series) -> str:
     stress = str(row["final_state"]) == "FULL_RISK"
     if alloc == "FLAT_LOWMID_RATE_STRESS":
         return "FLAT_LOWMID_RATE_STRESS"
-    if regime == "STEEP_LOW_RATE":
-        return "STEEP_LOW_RATE_NORMAL"
+    if alloc == "STEEP_LOW_RATE_STRESS":
+        return "STEEP_LOW_RATE_STRESS"
     if alloc in STATE_ORDER:
         return alloc
     if regime == "INVERTED":
         return "INVERTED_STRESS" if stress else "INVERTED_NORMAL"
     return alloc
+
+
+def pure_cross_state(row: pd.Series) -> str:
+    regime = str(row["final_regime_confirmed"])
+    stress = str(row["final_state"]) == "FULL_RISK"
+    if regime in {"FLAT_LOW_RATE", "FLAT_MID_RATE"} and stress:
+        return "FLAT_LOWMID_RATE_STRESS"
+    return f"{regime}_{'STRESS' if stress else 'NORMAL'}"
 
 
 def plot_asset_behavior_heatmap(
@@ -415,6 +425,7 @@ def main() -> None:
     panel, perf = build_final_source_only_panel()
     panel = panel.copy()
     panel["heatmap_cross_state"] = panel.apply(heatmap_cross_state, axis=1)
+    panel["pure_cross_state"] = panel.apply(pure_cross_state, axis=1)
     panel.to_csv(OUT / "daily_backtest_panel.csv", index=False)
     panel.to_csv(TABLE_DIR / "daily_backtest_panel.csv", index=False)
     panel.to_csv(TABLE_DIR / "final_daily_panel.csv", index=False)
@@ -423,10 +434,19 @@ def main() -> None:
     display_perf.to_csv(TABLE_DIR / "strategy_performance_comparison.csv", index=False)
 
     cross_behavior = asset_behavior(panel, "heatmap_cross_state")
+    pure_behavior = asset_behavior(panel, "pure_cross_state")
     regime_behavior = asset_behavior(panel, "final_regime_confirmed")
     cross_behavior.to_csv(TABLE_DIR / "cross_state_asset_behavior.csv", index=False)
+    pure_behavior.to_csv(TABLE_DIR / "pure_cross_state_asset_behavior.csv", index=False)
     regime_behavior.to_csv(TABLE_DIR / "regime_asset_behavior.csv", index=False)
     crisis_performance(panel).to_csv(TABLE_DIR / "crisis_window_performance.csv", index=False)
+    (
+        panel.groupby("pure_cross_state")
+        .agg(days=("date", "size"))
+        .reset_index()
+        .sort_values("days", ascending=False)
+        .to_csv(TABLE_DIR / "pure_cross_state_day_counts.csv", index=False)
+    )
 
     panel[["date"] + [f"{FINAL}_weight_{asset}" for asset in ASSETS]].to_csv(TABLE_DIR / "final_daily_weights.csv", index=False)
     panel[
@@ -442,6 +462,7 @@ def main() -> None:
             "trigger_lock_active_locks",
             "final_regime_confirmed",
             "heatmap_cross_state",
+            "pure_cross_state",
         ]
     ].to_csv(TABLE_DIR / "final_daily_returns.csv", index=False)
 
@@ -460,6 +481,21 @@ def main() -> None:
         "heatmap_cross_state",
         "cross_state_asset_sharpe_heatmap.png",
         "Asset Sharpe Ratio by Final Cross-State Allocation",
+        value_col="Sharpe",
+        value_label="Sharpe ratio",
+        value_format="number",
+    )
+    plot_asset_behavior_heatmap(
+        pure_behavior,
+        "pure_cross_state",
+        "pure_regime_stress_asset_behavior_heatmap.png",
+        "Asset Annualized Return by Pure Regime x Stress Block",
+    )
+    plot_asset_behavior_heatmap(
+        pure_behavior,
+        "pure_cross_state",
+        "pure_regime_stress_asset_sharpe_heatmap.png",
+        "Asset Sharpe Ratio by Pure Regime x Stress Block",
         value_col="Sharpe",
         value_label="Sharpe ratio",
         value_format="number",
@@ -532,6 +568,7 @@ Key design choices:
   - `HIGH -> MID = 3.0`
   - `MID -> HIGH = 3.2`
 - `STEEP_LOW_RATE` does not allow native credit entries.
+- Carry-over stress is shown explicitly in the cross-state heatmap. `STEEP_LOW_RATE_STRESS` has no native trigger, but if an active stress period carries into `STEEP_LOW_RATE`, it remains a stress sleeve and is analyzed separately.
 - `CASH_return` uses geometric daily DTB3.
 - Inverse-vol window is 90 trading days.
 - Transaction cost uses 10 bps one-way.
@@ -544,12 +581,19 @@ Final allocation settings:
 - `FLAT_HIGH_RATE_NORMAL`: GOLD / CMDTY_FUT inverse-vol.
 - `FLAT_HIGH_RATE_STRESS`: 70% IEF + 30% (GOLD / CMDTY_FUT inverse-vol).
 - `STEEP_LOW_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
+- `STEEP_LOW_RATE_STRESS`: 100% SPY.
 - `STEEP_MID_RATE_NORMAL`: 100% SPY.
 - `STEEP_MID_RATE_STRESS`: 100% IEF.
-- `STEEP_HIGH_RATE_NORMAL`: SPY / GOLD / CMDTY_FUT inverse-vol.
+- `STEEP_HIGH_RATE_NORMAL`: 70% GOLD + 30% (SPY / CMDTY_FUT inverse-vol).
 - `STEEP_HIGH_RATE_STRESS`: 100% IEF.
 - `INVERTED_NORMAL`: SPY / GOLD inverse-vol.
 - `INVERTED_STRESS`: 10% CASH + 90% (SPY / GOLD inverse-vol).
+
+Pure regime x stress outputs are also written into the mainline output set:
+
+- `results/main_pipeline_final/figures/pure_regime_stress_asset_behavior_heatmap.png`
+- `results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png`
+- `results/main_pipeline_final/tables/pure_cross_state_asset_behavior.csv`
 
 Main run order:
 

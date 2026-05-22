@@ -10,7 +10,7 @@ This repo now uses a buffered multi-state macro classification together with a V
 |---|---:|---:|---:|---:|---:|---:|
 | SPY_BUY_HOLD | 11.14% | 0.575 | 0.702 | -55.19% | 0.202 | 8.38 |
 | SPY_CASH_TIMING | 14.09% | 1.280 | 1.420 | -14.60% | 0.965 | 14.22 |
-| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 21.98% | 1.789 | 2.285 | -12.49% | 1.759 | 54.62 |
+| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 22.20% | 1.808 | 2.303 | -12.49% | 1.776 | 56.61 |
 
 Relative to SPY buy-and-hold, the final strategy materially improves return and drawdown. Relative to the matching `SPY_CASH_TIMING` benchmark, it keeps the improved timing state machine and compounds more efficiently through regime-specific allocation.
 
@@ -129,7 +129,7 @@ Final sleeves:
 | `STEEP_LOW_RATE_STRESS` | `100% SPY` |
 | `STEEP_MID_RATE_NORMAL` | `100% SPY` |
 | `STEEP_MID_RATE_STRESS` | `100% IEF` |
-| `STEEP_HIGH_RATE_NORMAL` | `SPY + GOLD + CMDTY_FUT` inverse-vol |
+| `STEEP_HIGH_RATE_NORMAL` | `70% GOLD + 30% (SPY + CMDTY_FUT inverse-vol)` |
 | `STEEP_HIGH_RATE_STRESS` | `100% IEF` |
 | `INVERTED_NORMAL` | `SPY + GOLD` inverse-vol |
 | `INVERTED_STRESS` | `10% CASH + 90% (SPY + GOLD inverse-vol)` |
@@ -144,9 +144,12 @@ Notes:
 
 ![Cross-state Sharpe heatmap](results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
 
+![Pure regime-stress Sharpe heatmap](results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png)
+
 These heatmaps are part of the main thesis:
 1. macro data itself has internal structure, so `FLAT` and `STEEP` should not be forced into one coarse low/high split;
 2. asset behavior also changes across those refined states, so the extra classification has allocation value.
+3. the pure `regime x stress` Sharpe view is now part of the mainline outputs, so carry-over stress blocks can be analyzed directly.
 
 Current heatmap buckets and sample sizes:
 - `FLAT_LOW_RATE_NORMAL`: `193`
@@ -155,6 +158,7 @@ Current heatmap buckets and sample sizes:
 - `FLAT_HIGH_RATE_NORMAL`: `443`
 - `FLAT_HIGH_RATE_STRESS`: `121`
 - `STEEP_LOW_RATE_NORMAL`: `985`
+- `STEEP_LOW_RATE_STRESS`: `188`
 - `STEEP_MID_RATE_NORMAL`: `678`
 - `STEEP_MID_RATE_STRESS`: `339`
 - `STEEP_HIGH_RATE_NORMAL`: `385`
@@ -166,8 +170,8 @@ Current heatmap buckets and sample sizes:
 
 | Window | SPY_CASH_TIMING | FINAL_REGIME_HEDGE_TRIGGER_LOCK |
 |---|---:|---:|
-| 2008_GFC | `+7.40%`, MaxDD `-8.17%` | `+44.42%`, MaxDD `-6.18%` |
-| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+18.06%`, MaxDD `-9.54%` |
+| 2008_GFC | `+7.40%`, MaxDD `-8.17%` | `+42.56%`, MaxDD `-6.18%` |
+| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+20.05%`, MaxDD `-9.54%` |
 | 2015_2016 | `+3.24%`, MaxDD `-3.32%` | `+17.18%`, MaxDD `-5.70%` |
 | COVID_2020 | `+17.01%`, MaxDD `-6.99%` | `+20.59%`, MaxDD `-10.41%` |
 | 2022_RATE_WAR | `+3.79%`, MaxDD `-9.73%` | `+14.80%`, MaxDD `-10.29%` |
