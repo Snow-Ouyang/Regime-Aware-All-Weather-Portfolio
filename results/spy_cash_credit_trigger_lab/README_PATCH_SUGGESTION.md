@@ -1,1 +1,0 @@
-We isolated credit trigger timing in a SPY/CASH framework. Although several stricter unlock and z-score variants improved individual episodes, none produced a robust full-sample improvement over the simpler baseline credit lock. Therefore, the final strategy keeps the simpler credit logic.

@@ -1,9 +1,4 @@
-"""Source-only canonical builder for the final regime-hedge strategy.
-
-This module intentionally reads only source data under data/raw and
-data/processed. Existing results are allowed only by callers for comparison,
-never as required inputs.
-"""
+"""Source-only canonical builder for the final regime-hedge strategy."""
 
 from __future__ import annotations
 
@@ -22,31 +17,38 @@ SOURCE_INPUTS = {
     "dgs1": ROOT / "data" / "raw" / "macro" / "rate" / "DGS1.csv",
     "dtb3": ROOT / "data" / "raw" / "macro" / "rate" / "DTB3.csv",
     "vix": ROOT / "data" / "raw" / "macro" / "volatility" / "VIXCLS.csv",
-    "waaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DAAA.csv",
-    "wbaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DBAA.csv",
+    "daaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DAAA.csv",
+    "dbaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DBAA.csv",
 }
 
 ASSETS = ["SPY", "GOLD", "CMDTY_FUT", "IEF", "CASH"]
 SPY_BUY_HOLD = "SPY_BUY_HOLD"
 SPY_CASH_TIMING = "SPY_CASH_TIMING"
 FINAL_STRATEGY = "FINAL_REGIME_HEDGE_TRIGGER_LOCK"
-REFINED_BASELINE = "FLAT_RATE_REFINED_L50_H30"
+REFINED_BASELINE = "REGIME_ONLY_REFERENCE"
 ASSET_RETURN_MAP = {
     "SPY_return": "SPY",
     "GOLD_return": "GLD",
     "CMDTY_FUT_return": "GD=F",
     "IEF_return": "IEF",
 }
+
 CONFIRMATION_DAYS = 3
-GS10_THRESHOLD = 3.0
-STEEP_GS1_THRESHOLD = 0.3
 INV_VOL_WINDOW = 90
 ONE_WAY_COST_BPS = 10.0
-RECOVERY_WINDOW = 20
 TRIGGER_LOCK_CREDIT_WINDOW = 15
 TRIGGER_LOCK_CREDIT_ENTRY_THRESHOLD = 0.10
-TRIGGER_LOCK_CREDIT_EXIT_THRESHOLD = 0.0
 TRIGGER_LOCK_CREDIT_LEVEL_Z_EXIT_THRESHOLD = 0.9
+
+FLAT_MID_TO_LOW = 1.1
+FLAT_LOW_TO_MID = 1.3
+FLAT_HIGH_TO_MID = 3.4
+FLAT_MID_TO_HIGH = 3.6
+
+STEEP_MID_TO_LOW = 2.0
+STEEP_LOW_TO_MID = 2.3
+STEEP_HIGH_TO_MID = 3.0
+STEEP_MID_TO_HIGH = 3.2
 
 
 def rel(path: Path) -> str:
@@ -96,19 +98,6 @@ def confirm_state(raw: Iterable[str], confirmation_days: int = CONFIRMATION_DAYS
     return confirmed
 
 
-def confirm_steep_rate_split(df: pd.DataFrame, threshold: float = STEEP_GS1_THRESHOLD) -> pd.Series:
-    """Confirm STEEP low/high short-rate labels within confirmed STEEP blocks."""
-    steep = df["refined_regime_confirmed"].eq("STEEP")
-    raw = pd.Series(index=df.index, dtype="object")
-    raw.loc[steep] = df.loc[steep, "GS1"].le(threshold).map({True: "STEEP_LOW_RATE", False: "STEEP_HIGH_RATE"})
-    confirmed = pd.Series(index=df.index, dtype="object")
-    block_id = (steep.ne(steep.shift(1)) & steep).cumsum()
-    for _, idx in df.index[steep].to_series().groupby(block_id[steep]):
-        labels = raw.loc[idx].astype(str).tolist()
-        confirmed.loc[idx] = confirm_state(labels, confirmation_days=CONFIRMATION_DAYS, initial=labels[0])
-    return confirmed
-
-
 def build_monthly_either_state(df: pd.DataFrame) -> pd.Series:
     monthly = df[["date", "spy_price"]].dropna().copy()
     monthly = monthly.set_index("date").resample("ME").last().dropna().reset_index()
@@ -132,6 +121,69 @@ def build_monthly_either_state(df: pd.DataFrame) -> pd.Series:
     return merged["monthly_either_state"].fillna("HOLD")
 
 
+def classify_flat_three_state(panel: pd.DataFrame) -> pd.Series:
+    out = panel["macro_regime_confirmed"].astype(object).copy()
+    flat = panel["macro_regime_confirmed"].eq("FLAT")
+    confirmed = pd.Series(index=panel.index, dtype="object")
+    block_id = (flat.ne(flat.shift(1)) & flat).cumsum()
+    for _, idx in panel.index[flat].to_series().groupby(block_id[flat]):
+        values = panel.loc[idx, "GS10"]
+        first = float(values.iloc[0])
+        if first <= FLAT_MID_TO_LOW:
+            current = "FLAT_LOW_RATE"
+        elif first >= FLAT_MID_TO_HIGH:
+            current = "FLAT_HIGH_RATE"
+        else:
+            current = "FLAT_MID_RATE"
+        raw_labels: list[str] = []
+        for value in values:
+            value = float(value)
+            if current == "FLAT_LOW_RATE" and value >= FLAT_LOW_TO_MID:
+                current = "FLAT_MID_RATE"
+            elif current == "FLAT_MID_RATE" and value <= FLAT_MID_TO_LOW:
+                current = "FLAT_LOW_RATE"
+            elif current == "FLAT_MID_RATE" and value >= FLAT_MID_TO_HIGH:
+                current = "FLAT_HIGH_RATE"
+            elif current == "FLAT_HIGH_RATE" and value <= FLAT_HIGH_TO_MID:
+                current = "FLAT_MID_RATE"
+            raw_labels.append(current)
+        confirmed.loc[idx] = confirm_state(raw_labels, confirmation_days=CONFIRMATION_DAYS, initial=raw_labels[0])
+    out.loc[flat] = confirmed.loc[flat]
+    return out.astype(str)
+
+
+def classify_steep_three_state(panel: pd.DataFrame, base_regime: pd.Series) -> pd.Series:
+    out = base_regime.copy()
+    steep = panel["macro_regime_confirmed"].eq("STEEP")
+    confirmed = pd.Series(index=panel.index, dtype="object")
+    block_id = (steep.ne(steep.shift(1)) & steep).cumsum()
+    for _, idx in panel.index[steep].to_series().groupby(block_id[steep]):
+        values = panel.loc[idx, "GS10"]
+        first = float(values.iloc[0])
+        if first <= STEEP_MID_TO_LOW:
+            current = "STEEP_LOW_RATE"
+        elif first >= STEEP_MID_TO_HIGH:
+            current = "STEEP_HIGH_RATE"
+        else:
+            current = "STEEP_MID_RATE"
+        raw_labels: list[str] = []
+        for value in values:
+            value = float(value)
+            if current == "STEEP_LOW_RATE" and value >= STEEP_LOW_TO_MID:
+                current = "STEEP_MID_RATE"
+            elif current == "STEEP_MID_RATE" and value <= STEEP_MID_TO_LOW:
+                current = "STEEP_LOW_RATE"
+            elif current == "STEEP_MID_RATE" and value >= STEEP_MID_TO_HIGH:
+                current = "STEEP_HIGH_RATE"
+            elif current == "STEEP_HIGH_RATE" and value <= STEEP_HIGH_TO_MID:
+                current = "STEEP_MID_RATE"
+            raw_labels.append(current)
+        confirmed.loc[idx] = confirm_state(raw_labels, confirmation_days=CONFIRMATION_DAYS, initial=raw_labels[0])
+    out.loc[steep] = confirmed.loc[steep]
+    out.loc[panel["macro_regime_confirmed"].eq("INVERTED")] = "INVERTED"
+    return out.astype(str)
+
+
 def build_source_panel() -> pd.DataFrame:
     returns = read_source_csv(SOURCE_INPUTS["asset_returns"], parse_dates=["date"])
     prices = read_source_csv(SOURCE_INPUTS["asset_prices"], parse_dates=["date"])
@@ -139,15 +191,15 @@ def build_source_panel() -> pd.DataFrame:
     dgs1 = read_fred_series(SOURCE_INPUTS["dgs1"], "DGS1")
     dtb3 = read_fred_series(SOURCE_INPUTS["dtb3"], "DTB3")
     vix = read_fred_series(SOURCE_INPUTS["vix"], "VIXCLS").rename(columns={"VIXCLS": "VIX_LEVEL"})
-    waaa = read_fred_series(SOURCE_INPUTS["waaa"], "DAAA").rename(columns={"DAAA": "WAAA"})
-    wbaa = read_fred_series(SOURCE_INPUTS["wbaa"], "DBAA").rename(columns={"DBAA": "WBAA"})
+    daaa = read_fred_series(SOURCE_INPUTS["daaa"], "DAAA").rename(columns={"DAAA": "WAAA"})
+    dbaa = read_fred_series(SOURCE_INPUTS["dbaa"], "DBAA").rename(columns={"DBAA": "WBAA"})
 
     panel = prices[["date", "SPY"]].rename(columns={"SPY": "spy_price"}).copy()
     for out_col, src_col in ASSET_RETURN_MAP.items():
         if src_col not in returns.columns:
             raise ValueError(f"Missing source return column {src_col} for {out_col}")
         panel = panel.merge(returns[["date", src_col]].rename(columns={src_col: out_col}), on="date", how="left")
-    for frame in [dgs10, dgs1, dtb3, vix, waaa, wbaa]:
+    for frame in [dgs10, dgs1, dtb3, vix, daaa, dbaa]:
         panel = panel.merge(frame, on="date", how="left")
     panel = panel.sort_values("date").drop_duplicates("date").reset_index(drop=True)
 
@@ -159,10 +211,8 @@ def build_source_panel() -> pd.DataFrame:
     panel["TERM_SPREAD_10Y_1Y"] = panel["DGS10"] - panel["DGS1"]
     panel["CREDIT_SPREAD_BAA_AAA"] = panel["WBAA"] - panel["WAAA"]
     panel["D_CREDIT_SPREAD_20D"] = panel["CREDIT_SPREAD_BAA_AAA"] - panel["CREDIT_SPREAD_BAA_AAA"].shift(20)
-    panel["D_CREDIT_SPREAD_15D"] = panel["CREDIT_SPREAD_BAA_AAA"] - panel["CREDIT_SPREAD_BAA_AAA"].shift(
-        TRIGGER_LOCK_CREDIT_WINDOW
-    )
-    panel["CASH_return"] = (1.0 + panel["DTB3"].ffill() / 100.0) ** (1.0 / 252.0) - 1.0
+    panel["D_CREDIT_SPREAD_15D"] = panel["CREDIT_SPREAD_BAA_AAA"] - panel["CREDIT_SPREAD_BAA_AAA"].shift(TRIGGER_LOCK_CREDIT_WINDOW)
+    panel["CASH_return"] = (1.0 + panel["DTB3"] / 100.0) ** (1.0 / 252.0) - 1.0
     panel["daily_rf"] = panel["CASH_return"]
 
     panel["spy_drawdown_from_previous_high"] = panel["spy_price"] / panel["spy_price"].cummax() - 1.0
@@ -173,6 +223,7 @@ def build_source_panel() -> pd.DataFrame:
     )
     panel["SPY_above_MA20"] = panel["spy_price"] > panel["SPY_MA20"]
     panel["SPY_above_MA50"] = panel["spy_price"] > panel["SPY_MA50"]
+
     vix_roll = panel["VIX_LEVEL"].rolling(120, min_periods=120)
     panel["VIX_ZSCORE_120D"] = (panel["VIX_LEVEL"] - vix_roll.mean()) / vix_roll.std(ddof=1).replace(0, np.nan)
     credit_roll = panel["CREDIT_SPREAD_BAA_AAA"].rolling(252, min_periods=126)
@@ -196,26 +247,20 @@ def build_source_panel() -> pd.DataFrame:
     )
     panel["macro_regime_raw"] = raw_regime
     panel["macro_regime_confirmed"] = confirm_state(raw_regime, confirmation_days=CONFIRMATION_DAYS, initial=str(raw_regime[0]))
-    if panel["macro_regime_confirmed"].eq("NEUTRAL").any():
-        raise RuntimeError("Canonical source-only regime must not produce NEUTRAL.")
-
-    refined_raw = np.where(
-        panel["macro_regime_raw"].eq("FLAT") if isinstance(panel["macro_regime_raw"], pd.Series) else raw_regime == "FLAT",
-        np.where(panel["GS10"] <= GS10_THRESHOLD, "FLAT_LOW_RATE", "FLAT_HIGH_RATE"),
-        raw_regime,
-    )
-    panel["refined_regime_raw"] = refined_raw
-    panel["refined_regime_confirmed"] = confirm_state(refined_raw, confirmation_days=CONFIRMATION_DAYS, initial=str(refined_raw[0]))
-    panel["steep_rate_regime_confirmed"] = confirm_steep_rate_split(panel)
-    panel["final_regime_confirmed"] = panel["refined_regime_confirmed"]
-    panel.loc[panel["refined_regime_confirmed"].eq("STEEP"), "final_regime_confirmed"] = panel.loc[
-        panel["refined_regime_confirmed"].eq("STEEP"), "steep_rate_regime_confirmed"
-    ]
     panel["monthly_either_state"] = build_monthly_either_state(panel)
 
     panel = panel.loc[panel["date"] >= pd.Timestamp("2006-03-16")].reset_index(drop=True)
     for col in ["SPY_return", "GOLD_return", "CMDTY_FUT_return", "IEF_return", "CASH_return", "daily_rf"]:
         panel[col] = pd.to_numeric(panel[col], errors="coerce").fillna(0.0)
+
+    flat_regime = classify_flat_three_state(panel)
+    final_regime = classify_steep_three_state(panel, flat_regime)
+    panel["refined_regime_confirmed"] = final_regime
+    panel["final_regime_confirmed"] = final_regime
+    panel["flat_refined_state"] = final_regime
+    panel["steep_rate_regime_confirmed"] = np.where(
+        final_regime.astype(str).str.startswith("STEEP_"), final_regime, pd.NA
+    )
     return panel
 
 
@@ -224,8 +269,6 @@ def inverse_vol_weights(df: pd.DataFrame, pool: list[str], window: int = INV_VOL
     vol = ret.rolling(window, min_periods=window).std(ddof=1) * np.sqrt(252.0)
     inv = 1.0 / vol.replace(0, np.nan)
     weights = inv.div(inv.sum(axis=1), axis=0)
-    # Before a full window is available, use equal weights only to make the
-    # source-only pipeline runnable; affected rows are flagged in output.
     eq = pd.Series({asset: 1.0 / len(pool) for asset in pool})
     weights = weights.apply(lambda row: eq if row.isna().all() else row.fillna(0.0) / row.fillna(0.0).sum(), axis=1)
     return weights.reindex(columns=pool).fillna(0.0)
@@ -260,155 +303,39 @@ def normalize_weight_dict(weights: dict[str, float]) -> dict[str, float]:
     return {asset: clean[asset] / total for asset in ASSETS}
 
 
-def build_backbone_and_states(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    out["FLAT_VIX_STRESS"] = out["macro_regime_confirmed"].eq("FLAT") & (out["VIX_ZSCORE_120D"] >= 3.0)
-    out["FLAT_CREDIT_DD5_STRESS"] = out["macro_regime_confirmed"].eq("FLAT") & (
-        (out["spy_drawdown_from_previous_high"] <= -0.05) & (out["D_CREDIT_SPREAD_20D"] > 0.10)
-    )
-    out["STEEP_EITHER_SELL_STRESS"] = out["macro_regime_confirmed"].eq("STEEP") & out["monthly_either_state"].eq("SELL")
-    out["STEEP_CREDIT_DD5_STRESS"] = out["macro_regime_confirmed"].eq("STEEP") & (
-        (out["spy_drawdown_from_previous_high"] <= -0.05) & (out["D_CREDIT_SPREAD_20D"] > 0.10)
-    )
-    out["STEEP_CMDTY_RET60_NEG10"] = out["macro_regime_confirmed"].eq("STEEP") & (out["CMDTY_RET60"] < -0.10)
-    out["BACKBONE_V2_ENTRY_SIGNAL"] = (
-        out["FLAT_VIX_STRESS"]
-        | out["FLAT_CREDIT_DD5_STRESS"]
-        | out["STEEP_EITHER_SELL_STRESS"]
-        | out["STEEP_CREDIT_DD5_STRESS"]
-    )
-    out["R3_RECOVERY"] = out["SPY_CROSS_ABOVE_MA20"]
-
-    full_risk = []
-    state = "NON_RISK"
-    pending = "NON_RISK"
-    for _, row in out.iterrows():
-        state = pending
-        full_risk.append(state == "FULL_RISK")
-        pending = state
-        if state != "FULL_RISK" and bool(row["BACKBONE_V2_ENTRY_SIGNAL"]):
-            pending = "FULL_RISK"
-        elif state == "FULL_RISK" and bool(row["R3_RECOVERY"]):
-            pending = "NON_RISK"
-    out["full_risk_state"] = np.where(full_risk, "FULL_RISK", "NON_RISK")
-
-    slow_overlay = []
-    pending_overlay = False
-    overlay = False
-    for _, row in out.iterrows():
-        overlay = pending_overlay
-        if row["full_risk_state"] == "FULL_RISK":
-            overlay = False
-        slow_overlay.append(overlay)
-        pending_overlay = overlay
-        if row["full_risk_state"] != "FULL_RISK" and not overlay and bool(row["STEEP_CMDTY_RET60_NEG10"]):
-            pending_overlay = True
-        elif overlay and bool(row["R3_RECOVERY"]):
-            pending_overlay = False
-    out["steep_slow_growth_overlay_state"] = slow_overlay
-    out["is_stress_state"] = out["full_risk_state"].eq("FULL_RISK") | out["refined_regime_confirmed"].isin(
-        ["FLAT_LOW_RATE", "FLAT_HIGH_RATE"]
-    ) & out["full_risk_state"].eq("FULL_RISK")
-    return out
-
-
-def base_refined_weights(df: pd.DataFrame, inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.Series]:
-    out = df.copy()
-    flat_low_normal = monthly_hold_weights(out, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
-    flat_high_normal = monthly_hold_weights(out, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
-    steep_high_normal = monthly_hold_weights(out, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
-    inverted_normal = monthly_hold_weights(out, ["SPY", "GOLD"], window=inv_vol_window)
-    weights = pd.DataFrame(0.0, index=out.index, columns=ASSETS)
-    states = []
-    for i, row in out.iterrows():
-        refined = row["refined_regime_confirmed"]
-        full_risk = row["full_risk_state"] == "FULL_RISK"
-        slow = bool(row["steep_slow_growth_overlay_state"])
-        if refined == "FLAT_LOW_RATE":
-            if full_risk:
-                w = {"GOLD": 1.0}
-                state = "FLAT_LOW_RATE_STRESS"
-            else:
-                w = flat_low_normal.loc[i].to_dict()
-                state = "FLAT_LOW_RATE_NORMAL"
-        elif refined == "FLAT_HIGH_RATE":
-            if full_risk:
-                w = {"IEF": 0.90, "CASH": 0.10}
-                state = "FLAT_HIGH_RATE_STRESS"
-            else:
-                w = flat_high_normal.loc[i].to_dict()
-                state = "FLAT_HIGH_RATE_NORMAL"
-        elif refined == "STEEP":
-            if full_risk:
-                w = {"GOLD": 0.30, "IEF": 0.70}
-                state = "STEEP_FULL_RISK"
-            elif slow:
-                w = {"SPY": 0.50, "IEF": 0.50}
-                state = "STEEP_SLOW_GROWTH_OVERLAY"
-            elif row["steep_rate_regime_confirmed"] == "STEEP_HIGH_RATE":
-                w = steep_high_normal.loc[i].to_dict()
-                state = "STEEP_HIGH_RATE_NORMAL"
-            else:
-                w = {"SPY": 1.0}
-                state = "STEEP_LOW_RATE_NORMAL"
-        elif refined == "INVERTED":
-            w = inverted_normal.loc[i].to_dict()
-            state = "INVERTED"
-        else:
-            raise ValueError(f"Unexpected refined regime: {refined}")
-        weights.loc[i, ASSETS] = pd.Series(normalize_weight_dict(w))
-        states.append(state)
-    return weights, pd.Series(states, index=out.index, name="flat_refined_state")
-
-
-def apply_flat_low_recovery(df: pd.DataFrame, base_weights: pd.DataFrame, base_states: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
-    weights = base_weights.copy()
-    active: list[bool] = []
-    remaining = 0
-    was_stress = False
-    for i, row in df.iterrows():
-        is_stress = bool(base_states.iloc[i].endswith("_STRESS") or row["full_risk_state"] == "FULL_RISK")
-        is_flat_low_normal = base_states.iloc[i] == "FLAT_LOW_RATE_NORMAL"
-        if is_stress:
-            remaining = 0
-            flag = False
-        else:
-            if was_stress and is_flat_low_normal:
-                remaining = RECOVERY_WINDOW
-            if remaining > 0 and is_flat_low_normal:
-                selected = [asset for asset in ["SPY", "CMDTY_FUT", "GOLD"] if pd.notna(row.get(f"{asset}_return", np.nan))]
-                if selected:
-                    weights.loc[i, ASSETS] = 0.0
-                    for asset in selected:
-                        weights.loc[i, asset] = 1.0 / len(selected)
-                    flag = True
-                else:
-                    flag = False
-                remaining -= 1
-            else:
-                remaining = 0
-                flag = False
-        active.append(flag)
-        was_stress = is_stress
-    return weights, pd.Series(active, index=df.index, name="recovery_flat_low_active")
+def mixed_inv_vol_row(row_weights: dict[str, float], fixed: dict[str, float] | None = None) -> dict[str, float]:
+    weights = {k: float(v) for k, v in row_weights.items()}
+    if fixed:
+        residual = 1.0 - sum(float(v) for v in fixed.values())
+        scaled = {k: residual * weights.get(k, 0.0) for k in weights}
+        for k, v in fixed.items():
+            scaled[k] = scaled.get(k, 0.0) + float(v)
+        return normalize_weight_dict(scaled)
+    return normalize_weight_dict(weights)
 
 
 def normal_allocation_by_regime(
     i: int,
     final_regime: str,
     flat_low_normal: pd.DataFrame,
+    flat_mid_normal: pd.DataFrame,
     flat_high_normal: pd.DataFrame,
+    steep_low_normal: pd.DataFrame,
     steep_high_normal: pd.DataFrame,
     inverted_normal: pd.DataFrame,
 ) -> tuple[dict[str, float], str]:
     if final_regime == "FLAT_LOW_RATE":
         return flat_low_normal.loc[i].to_dict(), "FLAT_LOW_RATE_NORMAL"
+    if final_regime == "FLAT_MID_RATE":
+        return flat_mid_normal.loc[i].to_dict(), "FLAT_MID_RATE_NORMAL"
     if final_regime == "FLAT_HIGH_RATE":
         return flat_high_normal.loc[i].to_dict(), "FLAT_HIGH_RATE_NORMAL"
+    if final_regime == "STEEP_LOW_RATE":
+        return steep_low_normal.loc[i].to_dict(), "STEEP_LOW_RATE_NORMAL"
+    if final_regime == "STEEP_MID_RATE":
+        return {"SPY": 1.0}, "STEEP_MID_RATE_NORMAL"
     if final_regime == "STEEP_HIGH_RATE":
         return steep_high_normal.loc[i].to_dict(), "STEEP_HIGH_RATE_NORMAL"
-    if final_regime == "STEEP_LOW_RATE":
-        return {"SPY": 1.0}, "STEEP_LOW_RATE_NORMAL"
     if final_regime == "INVERTED":
         return inverted_normal.loc[i].to_dict(), "INVERTED_NORMAL"
     raise ValueError(f"Unexpected final regime: {final_regime}")
@@ -417,36 +344,39 @@ def normal_allocation_by_regime(
 def stress_allocation_by_regime(
     i: int,
     final_regime: str,
+    flat_high_stress_gc: pd.DataFrame,
+    steep_low_normal: pd.DataFrame,
     inverted_normal: pd.DataFrame,
 ) -> tuple[dict[str, float], str]:
-    if final_regime == "FLAT_LOW_RATE":
-        return {"CASH": 1.0}, "FLAT_LOW_RATE_STRESS"
+    if final_regime in {"FLAT_LOW_RATE", "FLAT_MID_RATE"}:
+        return {"CASH": 1.0}, "FLAT_LOWMID_RATE_STRESS"
     if final_regime == "FLAT_HIGH_RATE":
-        return {"IEF": 1.0}, "FLAT_HIGH_RATE_STRESS"
+        base = flat_high_stress_gc.loc[i].to_dict()
+        return mixed_inv_vol_row(base, {"IEF": 0.70}), "FLAT_HIGH_RATE_STRESS"
     if final_regime == "STEEP_LOW_RATE":
-        return {"SPY": 0.60, "IEF": 0.40}, "STEEP_LOW_RATE_STRESS"
-    if final_regime == "STEEP_HIGH_RATE":
-        return {"CASH": 0.10, "IEF": 0.90}, "STEEP_HIGH_RATE_STRESS"
+        # Credit is disabled here. Any residual stress is a carry-over, not a native steep-low stress state.
+        return steep_low_normal.loc[i].to_dict(), "STEEP_LOW_RATE_NORMAL"
+    if final_regime in {"STEEP_MID_RATE", "STEEP_HIGH_RATE"}:
+        return {"IEF": 1.0}, f"{final_regime}_STRESS"
     if final_regime == "INVERTED":
         base = inverted_normal.loc[i].to_dict()
-        scaled = {asset: 0.90 * float(weight) for asset, weight in base.items()}
-        scaled["CASH"] = scaled.get("CASH", 0.0) + 0.10
-        return scaled, "INVERTED_STRESS"
+        return mixed_inv_vol_row(base, {"CASH": 0.10}), "INVERTED_STRESS"
     raise ValueError(f"Unexpected final regime: {final_regime}")
 
 
 def allowed_trigger_locks(row: pd.Series) -> set[str]:
-    regime = row["final_regime_confirmed"]
+    regime = str(row["final_regime_confirmed"])
     locks: set[str] = set()
     vix_entry = bool(row["VIX_ZSCORE_120D"] >= 3.0)
     credit_entry = bool(
-        (row["D_CREDIT_SPREAD_15D"] > TRIGGER_LOCK_CREDIT_ENTRY_THRESHOLD)
+        pd.notna(row["D_CREDIT_SPREAD_15D"])
+        and (row["D_CREDIT_SPREAD_15D"] > TRIGGER_LOCK_CREDIT_ENTRY_THRESHOLD)
         and (not bool(row["SPY_above_MA20"]))
     )
-    if regime in {"FLAT_LOW_RATE", "FLAT_HIGH_RATE", "INVERTED"}:
+    if regime.startswith("FLAT_") or regime == "INVERTED":
         if vix_entry:
             locks.add("VIX")
-    if regime in {"FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_HIGH_RATE", "INVERTED"}:
+    if regime.startswith("FLAT_") or regime in {"STEEP_MID_RATE", "STEEP_HIGH_RATE", "INVERTED"}:
         if credit_entry:
             locks.add("CREDIT")
     return locks
@@ -454,8 +384,7 @@ def allowed_trigger_locks(row: pd.Series) -> set[str]:
 
 def unlock_trigger_locks(row: pd.Series, active_locks: set[str]) -> set[str]:
     unlocked: set[str] = set()
-    spy_above_ma20 = bool(row["SPY_above_MA20"])
-    vix_unlock = bool((row["VIX_ZSCORE_120D"] < 1.5) and spy_above_ma20)
+    vix_unlock = bool((row["VIX_ZSCORE_120D"] < 1.5) and row["SPY_above_MA20"])
     credit_unlock = bool(
         bool(row["SPY_above_MA50"])
         and pd.notna(row["CREDIT_LEVEL_Z_252D"])
@@ -468,13 +397,15 @@ def unlock_trigger_locks(row: pd.Series, active_locks: set[str]) -> set[str]:
     return unlocked
 
 
-def build_trigger_lock_final_weights(
-    df: pd.DataFrame, inv_vol_window: int = INV_VOL_WINDOW
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def build_trigger_lock_final_weights(df: pd.DataFrame, inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.DataFrame]:
     flat_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    flat_mid_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
     flat_high_normal = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
+    flat_high_stress_gc = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
+    steep_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
     steep_high_normal = monthly_hold_weights(df, ["SPY", "GOLD", "CMDTY_FUT"], window=inv_vol_window)
     inverted_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
+
     weights = pd.DataFrame(0.0, index=df.index, columns=ASSETS)
 
     pending_vix = False
@@ -488,16 +419,17 @@ def build_trigger_lock_final_weights(
         current_anchor = pending_anchor
         current_full_risk = current_vix or current_credit or bool(current_anchor)
         current_locks = {name for name, flag in [("VIX", current_vix), ("CREDIT", current_credit)] if flag}
-        final_regime = row["final_regime_confirmed"]
+        final_regime = str(row["final_regime_confirmed"])
 
         lock_added_today: set[str] = set()
         lock_unlocked_today: set[str] = set()
         entry_signal = False
         exit_signal = False
 
-        vix_ent = "VIX" in allowed_trigger_locks(row)
-        credit_ent = "CREDIT" in allowed_trigger_locks(row)
+        allowed_entries = allowed_trigger_locks(row)
         unlocked = unlock_trigger_locks(row, current_locks)
+        vix_ent = "VIX" in allowed_entries
+        credit_ent = "CREDIT" in allowed_entries
         vix_unl = "VIX" in unlocked
         credit_unl = "CREDIT" in unlocked
 
@@ -506,7 +438,7 @@ def build_trigger_lock_final_weights(
         next_anchor = current_anchor
 
         if current_full_risk:
-            w, allocation_state = stress_allocation_by_regime(i, final_regime, inverted_normal)
+            w, allocation_state = stress_allocation_by_regime(i, final_regime, flat_high_stress_gc, steep_low_normal, inverted_normal)
 
             if not current_anchor:
                 current_anchor = "BOTH" if current_vix and current_credit else "VIX" if current_vix else "CREDIT" if current_credit else ""
@@ -550,7 +482,9 @@ def build_trigger_lock_final_weights(
                 i,
                 final_regime,
                 flat_low_normal,
+                flat_mid_normal,
                 flat_high_normal,
+                steep_low_normal,
                 steep_high_normal,
                 inverted_normal,
             )
@@ -595,6 +529,32 @@ def build_trigger_lock_final_weights(
         )
 
     return weights, pd.DataFrame(rows, index=df.index)
+
+
+def base_reference_weights(df: pd.DataFrame, inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.Series]:
+    flat_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    flat_mid_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
+    flat_high_normal = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
+    steep_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    steep_high_normal = monthly_hold_weights(df, ["SPY", "GOLD", "CMDTY_FUT"], window=inv_vol_window)
+    inverted_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
+    weights = pd.DataFrame(0.0, index=df.index, columns=ASSETS)
+    states = []
+    for i, row in df.iterrows():
+        regime = str(row["final_regime_confirmed"])
+        w, state = normal_allocation_by_regime(
+            i,
+            regime,
+            flat_low_normal,
+            flat_mid_normal,
+            flat_high_normal,
+            steep_low_normal,
+            steep_high_normal,
+            inverted_normal,
+        )
+        weights.loc[i, ASSETS] = pd.Series(normalize_weight_dict(w))
+        states.append(state)
+    return weights, pd.Series(states, index=df.index, name="flat_refined_state")
 
 
 def compute_strategy(df: pd.DataFrame, weights: pd.DataFrame, name: str) -> pd.DataFrame:
@@ -648,28 +608,27 @@ def performance_metrics(df: pd.DataFrame, name: str) -> dict:
 
 def build_final_source_only_panel(inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.DataFrame]:
     panel = build_source_panel()
-    panel = build_backbone_and_states(panel)
-    base_weights, base_states = base_refined_weights(panel, inv_vol_window=inv_vol_window)
+
+    ref_weights, ref_states = base_reference_weights(panel, inv_vol_window=inv_vol_window)
     final_weights, trigger_lock_state = build_trigger_lock_final_weights(panel, inv_vol_window=inv_vol_window)
 
-    base = compute_strategy(panel, base_weights, REFINED_BASELINE)
+    ref = compute_strategy(panel, ref_weights, REFINED_BASELINE)
     final = compute_strategy(panel, final_weights, FINAL_STRATEGY)
     spy_weights = pd.DataFrame(0.0, index=panel.index, columns=ASSETS)
     spy_weights["SPY"] = 1.0
     spy = compute_strategy(panel, spy_weights, SPY_BUY_HOLD)
+
     spy_cash_weights = pd.DataFrame(0.0, index=panel.index, columns=ASSETS)
-    spy_cash_weights["SPY"] = np.where(trigger_lock_state["trigger_lock_full_risk_state"].eq("FULL_RISK"), 0.0, 1.0)
+    stress_active = trigger_lock_state["trigger_lock_full_risk_state"].eq("FULL_RISK")
+    spy_cash_weights["SPY"] = np.where(stress_active, 0.0, 1.0)
     spy_cash_weights["CASH"] = 1.0 - spy_cash_weights["SPY"]
     spy_cash = compute_strategy(panel, spy_cash_weights, SPY_CASH_TIMING)
 
-    out = pd.concat([panel, trigger_lock_state, base, final, spy, spy_cash], axis=1)
-    out["flat_refined_state"] = base_states
+    out = pd.concat([panel, trigger_lock_state, ref, final, spy, spy_cash], axis=1)
+    out["flat_refined_state"] = ref_states
     out["recovery_flat_low_active"] = False
-    out["final_state"] = np.where(
-        out["trigger_lock_full_risk_state"].eq("FULL_RISK"),
-        "FULL_RISK",
-        "NON_RISK",
-    )
+    out["full_risk_state"] = trigger_lock_state["trigger_lock_full_risk_state"]
+    out["final_state"] = np.where(stress_active, "FULL_RISK", "NON_RISK")
     perf = pd.DataFrame(
         [
             performance_metrics(out, SPY_BUY_HOLD),
@@ -681,9 +640,7 @@ def build_final_source_only_panel(inv_vol_window: int = INV_VOL_WINDOW) -> tuple
     return out, perf
 
 
-def write_source_only_outputs(
-    output_dir: Path | None = None, inv_vol_window: int = INV_VOL_WINDOW
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def write_source_only_outputs(output_dir: Path | None = None, inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.DataFrame]:
     out_dir = output_dir or ROOT / "results" / "final_strategy_source_only"
     table_dir = out_dir / "tables"
     table_dir.mkdir(parents=True, exist_ok=True)

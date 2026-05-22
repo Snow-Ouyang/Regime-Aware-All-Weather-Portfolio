@@ -1,1 +1,0 @@
-The SPY/CASH credit lab suggests that CW20_ABS15_ZW126_UZ1P5 improves credit timing before considering hedge allocation. It should be tested as a final strategy challenger.

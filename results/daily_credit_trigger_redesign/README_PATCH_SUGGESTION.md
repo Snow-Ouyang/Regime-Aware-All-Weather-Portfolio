@@ -1,1 +1,0 @@
-Daily credit trigger redesign found useful diagnostics but no robust replacement. The baseline credit trigger remains in the final strategy.

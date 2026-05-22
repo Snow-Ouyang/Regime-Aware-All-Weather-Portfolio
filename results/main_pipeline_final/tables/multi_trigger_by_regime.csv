@@ -1,6 +1,8 @@
 final_regime,total_days,days_with_0_full_risk_trigger,days_with_1_full_risk_trigger,days_with_2_full_risk_triggers,days_with_3_full_risk_triggers,multi_full_risk_trigger_rate,most_common_trigger_combination,most_common_trigger_combination_count,days_with_overlay_and_full_risk_trigger,overlay_full_risk_overlap_rate
-FLAT_HIGH_RATE,639,591,48,0,0,0.0,NONE,591,0,0.0
-FLAT_LOW_RATE,877,807,59,11,0,0.012542759407069556,NONE,807,0,0.0
+FLAT_HIGH_RATE,564,531,33,0,0,0.0,NONE,531,0,0.0
+FLAT_LOW_RATE,222,198,13,11,0,0.04954954954954955,NONE,198,0,0.0
+FLAT_MID_RATE,730,669,61,0,0,0.0,NONE,669,0,0.0
 INVERTED,923,893,26,4,0,0.004333694474539545,NONE,893,0,0.0
-STEEP_HIGH_RATE,1094,1014,80,0,0,0.0,NONE,1014,0,0.0
-STEEP_LOW_RATE,1541,1482,59,0,0,0.0,NONE,1482,0,0.0
+STEEP_HIGH_RATE,633,566,67,0,0,0.0,NONE,566,0,0.0
+STEEP_LOW_RATE,985,985,0,0,0,0.0,NONE,985,0,0.0
+STEEP_MID_RATE,1017,974,43,0,0,0.0,NONE,974,0,0.0

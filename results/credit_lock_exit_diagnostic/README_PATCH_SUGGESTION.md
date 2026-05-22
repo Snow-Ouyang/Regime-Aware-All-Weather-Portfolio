@@ -1,1 +1,0 @@
-We also tested stricter credit unlock and fast relock rules. Although some variants improved 2008 or 2022 locally, the trade-off with missed rebounds and reduced upside was not strong enough to replace the simpler baseline credit lock.

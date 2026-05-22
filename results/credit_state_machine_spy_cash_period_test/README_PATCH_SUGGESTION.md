@@ -1,1 +1,0 @@
-The abs_entry_level_z_unlock credit state machine better defines sustained credit stress periods in SPY/CASH timing tests, especially around 2008 and 2022. However, when migrated back into the full regime-hedge strategy, the improvement is less robust, so the final strategy keeps the simpler baseline credit trigger while documenting this as a defensive credit timing extension.

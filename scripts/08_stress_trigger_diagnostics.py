@@ -16,12 +16,10 @@ FIG_DIR = OUT / "figures"
 TRIGGERS = [
     "VIX_FULL_RISK_TRIGGER",
     "CREDIT_FULL_RISK_TRIGGER",
-    "CMDTY_FULL_RISK_TRIGGER",
 ]
 FULL_RISK_TRIGGERS = [
     "VIX_FULL_RISK_TRIGGER",
     "CREDIT_FULL_RISK_TRIGGER",
-    "CMDTY_FULL_RISK_TRIGGER",
 ]
 
 
@@ -41,11 +39,13 @@ def allocation_state(row: pd.Series) -> str:
     state = str(row.get("final_allocation_state", row.get("flat_refined_state", "OTHER")))
     valid = {
         "FLAT_LOW_RATE_NORMAL",
-        "FLAT_LOW_RATE_STRESS",
+        "FLAT_MID_RATE_NORMAL",
+        "FLAT_LOWMID_RATE_STRESS",
         "FLAT_HIGH_RATE_NORMAL",
         "FLAT_HIGH_RATE_STRESS",
         "STEEP_LOW_RATE_NORMAL",
-        "STEEP_LOW_RATE_STRESS",
+        "STEEP_MID_RATE_NORMAL",
+        "STEEP_MID_RATE_STRESS",
         "STEEP_HIGH_RATE_NORMAL",
         "STEEP_HIGH_RATE_STRESS",
         "INVERTED_NORMAL",
@@ -60,10 +60,6 @@ def trigger_combination(row: pd.Series) -> str:
         parts.append("VIX")
     if bool(row.get("trigger_credit_drawdown", False) or row.get("EFFECTIVE_CREDIT_DRAWDOWN_TRIGGER", False)):
         parts.append("CREDIT")
-    if bool(row.get("trigger_cmdty", False) or row.get("CMDTY_FULL_RISK_TRIGGER", False)):
-        parts.append("CMDTY")
-    if bool(row.get("trigger_monthly_sell", False) or row.get("MONTHLY_SELL_FULL_RISK_TRIGGER", False)):
-        parts.append("MONTHLY_SELL")
     return "+".join(parts) if parts else "UNKNOWN"
 
 
@@ -97,28 +93,32 @@ def add_trigger_flags(panel: pd.DataFrame) -> pd.DataFrame:
     out = panel.copy()
     out["base_regime"] = out["macro_regime_confirmed"].where(out["macro_regime_confirmed"].isin(["FLAT", "STEEP", "INVERTED"]), "OTHER")
     out["refined_regime"] = out["refined_regime_confirmed"].where(
-        out["refined_regime_confirmed"].isin(["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP", "INVERTED"]),
+        out["refined_regime_confirmed"].isin(
+            ["FLAT_LOW_RATE", "FLAT_MID_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_MID_RATE", "STEEP_HIGH_RATE", "INVERTED"]
+        ),
         "OTHER",
     )
     out["final_regime"] = out.get("final_regime_confirmed", out["refined_regime"]).where(
         out.get("final_regime_confirmed", out["refined_regime"]).isin(
-            ["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_HIGH_RATE", "INVERTED"]
+            ["FLAT_LOW_RATE", "FLAT_MID_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_MID_RATE", "STEEP_HIGH_RATE", "INVERTED"]
         ),
         "OTHER",
     )
     out["allocation_state"] = out.apply(allocation_state, axis=1)
-    out["VIX_FULL_RISK_TRIGGER"] = out["final_regime"].isin(["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "INVERTED"]) & (
+    out["VIX_FULL_RISK_TRIGGER"] = out["final_regime"].isin(
+        ["FLAT_LOW_RATE", "FLAT_MID_RATE", "FLAT_HIGH_RATE", "INVERTED"]
+    ) & (
         out["VIX_ZSCORE_120D"] >= 3.0
     )
     out["RAW_CREDIT_DRAWDOWN_TRIGGER"] = (out["D_CREDIT_SPREAD_15D"] > 0.10) & (~out["SPY_above_MA20"])
     out["EFFECTIVE_CREDIT_DRAWDOWN_TRIGGER"] = out["RAW_CREDIT_DRAWDOWN_TRIGGER"] & out["final_regime"].isin(
-        ["FLAT_LOW_RATE", "FLAT_HIGH_RATE", "STEEP_LOW_RATE", "STEEP_HIGH_RATE", "INVERTED"]
+        ["FLAT_LOW_RATE", "FLAT_MID_RATE", "FLAT_HIGH_RATE", "STEEP_MID_RATE", "STEEP_HIGH_RATE", "INVERTED"]
     )
     out["CREDIT_FULL_RISK_TRIGGER"] = out["EFFECTIVE_CREDIT_DRAWDOWN_TRIGGER"]
     out["MONTHLY_SELL_FULL_RISK_TRIGGER"] = False
     out["CMDTY_FULL_RISK_TRIGGER"] = False
     out["STEEP_SLOW_GROWTH_OVERLAY_TRIGGER"] = False
-    out["FULL_RISK_TRIGGER_ANY"] = out["VIX_FULL_RISK_TRIGGER"] | out["CREDIT_FULL_RISK_TRIGGER"] | out["CMDTY_FULL_RISK_TRIGGER"]
+    out["FULL_RISK_TRIGGER_ANY"] = out["VIX_FULL_RISK_TRIGGER"] | out["CREDIT_FULL_RISK_TRIGGER"]
     out["FULL_RISK_ACTIVE"] = out["trigger_lock_full_risk_state"].eq("FULL_RISK")
     out["SLOW_GROWTH_OVERLAY_ACTIVE"] = False
     out["RECOVERY_ACTIVE"] = False
@@ -658,7 +658,6 @@ def plot_long_trigger_timeline(panel: pd.DataFrame) -> None:
     trigger_specs = [
         ("VIX_FULL_RISK_TRIGGER", "VIX", "o", "#7b3294"),
         ("CREDIT_FULL_RISK_TRIGGER", "Credit15+DD", "s", "#d7301f"),
-        ("CMDTY_FULL_RISK_TRIGGER", "Cmdty Lock", "D", "#2b8cbe"),
     ]
     fig, ax = plt.subplots(figsize=(22, 7))
     dates = panel["date"]
@@ -738,8 +737,9 @@ This module is diagnostic only. It does not change the canonical final strategy 
 
 ### Trigger Rules Summary
 
-- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `INVERTED`: VIX lock is active.
-- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `STEEP_LOW_RATE` / `STEEP_HIGH_RATE` / `INVERTED`: credit lock is active.
+- `FLAT_LOW_RATE` / `FLAT_MID_RATE` / `FLAT_HIGH_RATE` / `INVERTED`: VIX lock is active.
+- `FLAT_LOW_RATE` / `FLAT_MID_RATE` / `FLAT_HIGH_RATE` / `STEEP_MID_RATE` / `STEEP_HIGH_RATE` / `INVERTED`: credit lock is active.
+- `STEEP_LOW_RATE` has no native VIX or credit entry. Any stress days there are carry-over days from another regime and should not be interpreted as a separate trigger-enabled stress block.
 - Commodity lock is disabled in the final mainline.
 - Credit entry uses `D_CREDIT_SPREAD_15D > 0.10` and `SPY <= MA20`.
 - Credit unlock uses `SPY > MA50` and `CREDIT_LEVEL_Z_252D < 0.9`.
@@ -751,12 +751,12 @@ This module is diagnostic only. It does not change the canonical final strategy 
 
 - FULL_RISK entries and trigger-lock exits explain the main turnover.
 - `SPY_CASH_TIMING`, cross-state asset behavior, and the final hedge strategy now use the same VIX/CREDIT anchor stress definition.
-- FLAT_LOW/HIGH switches and inverse-vol rebalances are secondary contributors.
+- FLAT and STEEP internal buffered regime switches are secondary contributors relative to trigger-lock entries and exits.
 - {notes}
 
 ### Implication
 
-The final mainline keeps the simplified daily credit trigger with MA50 and credit-level normalization unlock, and does not include recovery overlay or broader parameter search.
+The final mainline keeps the simplified daily credit trigger with MA50 and credit-level normalization unlock, uses buffered six-regime classification, and does not include recovery overlay or a commodity trigger.
 """
     path.write_text(existing + "\n" + section.strip() + "\n", encoding="utf-8")
 

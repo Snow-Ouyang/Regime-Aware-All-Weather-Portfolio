@@ -1,1 +1,0 @@
-SPY/CASH trigger-lock is an important timing benchmark, but the final regime-aware hedge strategy retains higher compounding and better overall risk-adjusted performance.

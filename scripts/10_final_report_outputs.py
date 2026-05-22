@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
+from hmmlearn.hmm import GaussianHMM
+from sklearn.mixture import GaussianMixture
 
 from final_strategy_source_only_core import ASSETS, FINAL_STRATEGY, REFINED_BASELINE, ROOT, SPY_BUY_HOLD, SPY_CASH_TIMING, build_final_source_only_panel
 
@@ -14,6 +17,21 @@ FINAL = FINAL_STRATEGY
 BASE = REFINED_BASELINE
 SPY = SPY_BUY_HOLD
 DISPLAY_STRATEGIES = [SPY_BUY_HOLD, SPY_CASH_TIMING, FINAL_STRATEGY]
+
+STATE_ORDER = [
+    "FLAT_LOW_RATE_NORMAL",
+    "FLAT_MID_RATE_NORMAL",
+    "FLAT_LOWMID_RATE_STRESS",
+    "FLAT_HIGH_RATE_NORMAL",
+    "FLAT_HIGH_RATE_STRESS",
+    "STEEP_LOW_RATE_NORMAL",
+    "STEEP_MID_RATE_NORMAL",
+    "STEEP_MID_RATE_STRESS",
+    "STEEP_HIGH_RATE_NORMAL",
+    "STEEP_HIGH_RATE_STRESS",
+    "INVERTED_NORMAL",
+    "INVERTED_STRESS",
+]
 
 
 def ensure_dirs() -> None:
@@ -49,6 +67,21 @@ def asset_behavior(panel: pd.DataFrame, group_col: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def heatmap_cross_state(row: pd.Series) -> str:
+    regime = str(row["final_regime_confirmed"])
+    alloc = str(row["final_allocation_state"])
+    stress = str(row["final_state"]) == "FULL_RISK"
+    if alloc == "FLAT_LOWMID_RATE_STRESS":
+        return "FLAT_LOWMID_RATE_STRESS"
+    if regime == "STEEP_LOW_RATE":
+        return "STEEP_LOW_RATE_NORMAL"
+    if alloc in STATE_ORDER:
+        return alloc
+    if regime == "INVERTED":
+        return "INVERTED_STRESS" if stress else "INVERTED_NORMAL"
+    return alloc
+
+
 def plot_asset_behavior_heatmap(
     perf: pd.DataFrame,
     group_col: str,
@@ -59,13 +92,14 @@ def plot_asset_behavior_heatmap(
     value_format: str = "percent",
 ) -> None:
     heat = perf.pivot_table(index="asset", columns=group_col, values=value_col, aggfunc="first")
-    heat = heat.reindex(index=ASSETS)
+    cols = [c for c in STATE_ORDER if c in heat.columns] + [c for c in heat.columns if c not in STATE_ORDER]
+    heat = heat.reindex(index=ASSETS, columns=cols)
     if value_format == "percent":
         labels = heat.map(lambda x: "" if pd.isna(x) else f"{x:.1%}")
     else:
         labels = heat.map(lambda x: "" if pd.isna(x) else f"{x:.2f}")
-    fig_w = max(11, 1.15 * len(heat.columns))
-    fig, ax = plt.subplots(figsize=(fig_w, 5.5))
+    fig_w = max(12, 1.05 * len(heat.columns))
+    fig, ax = plt.subplots(figsize=(fig_w, 5.8))
     sns.heatmap(
         heat,
         annot=labels,
@@ -89,7 +123,9 @@ def plot_asset_behavior_heatmap(
 def crisis_performance(panel: pd.DataFrame) -> pd.DataFrame:
     windows = {
         "2008_GFC": ("2007-10-01", "2009-06-30"),
+        "2011_EURO_DEBT": ("2011-06-01", "2011-12-31"),
         "2015_2016": ("2015-05-01", "2016-03-31"),
+        "2018Q4": ("2018-10-01", "2019-01-31"),
         "COVID_2020": ("2020-02-01", "2020-06-30"),
         "2022_RATE_WAR": ("2021-11-01", "2023-03-31"),
         "2025_PULLBACK": ("2025-01-01", "2025-12-31"),
@@ -116,7 +152,9 @@ def crisis_performance(panel: pd.DataFrame) -> pd.DataFrame:
 
 CASE_WINDOWS = {
     "case_2008_GFC_final.png": ("2007-10-01", "2009-06-30"),
+    "case_2011_euro_debt_final.png": ("2011-06-01", "2011-12-31"),
     "case_2015_2016_final.png": ("2015-05-01", "2016-03-31"),
+    "case_2020_covid_final.png": ("2020-02-01", "2020-06-30"),
     "case_2022_rate_war_final.png": ("2021-11-01", "2023-03-31"),
     "case_2025_pullback_final.png": ("2025-01-01", "2025-12-31"),
 }
@@ -236,53 +274,160 @@ def plot_case_studies(panel: pd.DataFrame) -> None:
         plt.close(fig)
 
 
-def stress_trigger_readme_section() -> str:
+def build_gs10_structure_outputs(
+    panel: pd.DataFrame,
+    family: str,
+    state_prefix: str,
+    band_lines: list[tuple[float, str, str]],
+    fig_name: str,
+    table_prefix: str,
+) -> pd.DataFrame:
+    sub = panel.loc[panel["macro_regime_confirmed"].eq(family), ["date", "GS10", "final_regime_confirmed"]].dropna().copy()
+    sub = sub.loc[sub["final_regime_confirmed"].astype(str).str.startswith(state_prefix)].copy()
+    x = sub[["GS10"]].to_numpy()
+
+    gmm = GaussianMixture(n_components=3, covariance_type="full", random_state=0, n_init=20)
+    gmm.fit(x)
+    gmm_labels = gmm.predict(x)
+    order = np.argsort(gmm.means_.ravel())
+    remap = {old: new for new, old in enumerate(order)}
+    ordered_means = gmm.means_[order].copy().reshape(-1, 1)
+    ordered_covs = gmm.covariances_[order].copy().reshape(-1, 1, 1)
+    ordered_weights = gmm.weights_[order].copy()
+
+    sorted_labels = np.array([remap[i] for i in gmm_labels], dtype=int)
+    startprob = np.bincount(sorted_labels, minlength=3).astype(float)
+    startprob = startprob / startprob.sum()
+    transmat = np.full((3, 3), 1e-3)
+    for a, b in zip(sorted_labels[:-1], sorted_labels[1:]):
+        transmat[a, b] += 1.0
+    transmat = transmat / transmat.sum(axis=1, keepdims=True)
+
+    hmm = GaussianHMM(
+        n_components=3,
+        covariance_type="full",
+        n_iter=500,
+        random_state=0,
+        init_params="",
+        params="st",
+    )
+    hmm.startprob_ = startprob
+    hmm.transmat_ = transmat
+    hmm.means_ = ordered_means
+    hmm.covars_ = np.maximum(ordered_covs, 1e-4)
+    hmm.fit(x)
+    states = hmm.predict(x)
+
+    name_map = {0: "LOW", 1: "MID", 2: "HIGH"}
+    sub["hmm_state"] = states
+    sub["hmm_state_name"] = sub["hmm_state"].map(name_map)
+
+    summary = (
+        sub.groupby("hmm_state_name")
+        .agg(
+            n_days=("GS10", "size"),
+            mean_gs10=("GS10", "mean"),
+            median_gs10=("GS10", "median"),
+            min_gs10=("GS10", "min"),
+            max_gs10=("GS10", "max"),
+        )
+        .reset_index()
+    )
+    summary["model_mean"] = summary["hmm_state_name"].map({name_map[i]: float(hmm.means_.ravel()[i]) for i in range(3)})
+    summary["model_weight"] = summary["hmm_state_name"].map({name_map[i]: float((states == i).mean()) for i in range(3)})
+    summary["family"] = family
+
+    summary.to_csv(TABLE_DIR / f"{table_prefix}_hmm_summary.csv", index=False)
+    sub[["date", "GS10", "final_regime_confirmed", "hmm_state_name"]].to_csv(TABLE_DIR / f"{table_prefix}_hmm_daily_states.csv", index=False)
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+    sns.histplot(data=sub, x="GS10", hue="final_regime_confirmed", stat="count", common_norm=False, bins=28, ax=axes[0], alpha=0.45)
+    for xline, color, label in band_lines:
+        axes[0].axvline(xline, color=color, linestyle="--", linewidth=1.8, label=label)
+    axes[0].set_title(f"{family} GS10 full-sample distribution with hysteresis bands")
+    axes[0].legend(frameon=False, fontsize=8)
+
+    sns.kdeplot(data=sub, x="GS10", hue="final_regime_confirmed", common_norm=False, ax=axes[1], linewidth=2.0)
+    for state, color in [("LOW", "#ef4444"), ("MID", "#f59e0b"), ("HIGH", "#2563eb")]:
+        state_mean = float(summary.loc[summary["hmm_state_name"].eq(state), "model_mean"].iloc[0])
+        axes[1].axvline(state_mean, color=color, linestyle=":", linewidth=2.0, label=f"HMM {state} mean={state_mean:.2f}")
+    for xline, color, _label in band_lines:
+        axes[1].axvline(xline, color=color, linestyle="--", linewidth=1.2, alpha=0.8)
+    axes[1].set_title(f"{family} GS10 KDE with 3-state HMM means")
+    axes[1].legend(frameon=False, fontsize=8)
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / fig_name, dpi=170)
+    plt.close(fig)
+    return summary
+
+
+def stress_trigger_readme_section(flat_gs10_summary: pd.DataFrame, steep_gs10_summary: pd.DataFrame) -> str:
+    def state_line(df: pd.DataFrame, state: str) -> str:
+        row = df.loc[df["hmm_state_name"].eq(state)].iloc[0]
+        return f"- {state}: mean GS10 `{float(row['model_mean']):.2f}`, sample weight `{float(row['model_weight']):.1%}`"
+
     return f"""
 
-## Stress Trigger and Turnover Diagnostics
+## GS10 Internal Structure and Regime Buffers
 
-The canonical final strategy uses a trigger-lock state machine. This replaced the prior FLAT_LOW recovery overlay because it is lower-turnover, more tradable, and easier to explain.
+The final regime builder now diagnoses `FLAT` and `STEEP` separately with full-sample `GS10` KDE + HMM outputs. This is not a single global rate split. It is two separate internal-structure diagnostics that support low/mid/high classification within each family.
 
-### Trigger Rules Summary
+### FLAT GS10 structure
 
-- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `INVERTED`: VIX trigger is active.
-- `FLAT_LOW_RATE` / `FLAT_HIGH_RATE` / `STEEP_LOW_RATE` / `STEEP_HIGH_RATE` / `INVERTED`: credit trigger is active.
-- Commodity trigger is not part of the final mainline.
-- Monthly SELL is not part of the final state machine.
-- Credit entry uses `D_CREDIT_SPREAD_15D > 0.10` and `SPY <= MA20`.
-- Credit unlock uses `SPY > MA50` and `CREDIT_LEVEL_Z_252D < 0.9`.
-- VIX unlock uses `VIX_ZSCORE_120D < 1.5` with `SPY > MA20`.
-- The anchor-exit rule means VIX-led stress exits on VIX unlock, credit-led stress exits on credit unlock, and BOTH entries unlock independently.
+{state_line(flat_gs10_summary, "LOW")}
+{state_line(flat_gs10_summary, "MID")}
+{state_line(flat_gs10_summary, "HIGH")}
 
-### Key Findings
+- Hysteresis bands:
+  - `MID -> LOW = 1.1`
+  - `LOW -> MID = 1.3`
+  - `HIGH -> MID = 3.4`
+  - `MID -> HIGH = 3.6`
 
-- The final comparison now uses the same trigger-lock stress state for both `SPY_CASH_TIMING` and `FINAL_REGIME_HEDGE_TRIGGER_LOCK`.
-- Cross-state asset behavior is also grouped with the trigger-lock stress state, so the asset evidence and final strategy share the same stress definition.
-- Recovery overlay diagnostics are kept as exploratory history, but they are not part of the final mainline.
+### STEEP GS10 structure
 
-### Implication
+{state_line(steep_gs10_summary, "LOW")}
+{state_line(steep_gs10_summary, "MID")}
+{state_line(steep_gs10_summary, "HIGH")}
 
-Future research can still study state-machine refinements, but the current mainline is intentionally converged around the VIX/CREDIT anchor state machine without recovery overlay or commodity-trigger complexity.
+- Hysteresis bands:
+  - `MID -> LOW = 2.0`
+  - `LOW -> MID = 2.3`
+  - `HIGH -> MID = 3.0`
+  - `MID -> HIGH = 3.2`
+
+- All regime transitions still require `3-day confirm`.
+
+This does two things:
+
+1. It reflects the internal structure visible in `GS10` inside `FLAT` and `STEEP`, rather than forcing both into one coarse threshold rule.
+2. It reduces turnover by using hysteresis bands instead of single-point internal splits.
+
+The corresponding mainline figures are:
+
+- `results/main_pipeline_final/figures/flat_gs10_kde_hmm.png`
+- `results/main_pipeline_final/figures/steep_gs10_kde_hmm.png`
 """
 
 
 def main() -> None:
     ensure_dirs()
     panel, perf = build_final_source_only_panel()
-    stress_flag = panel["final_state"].eq("FULL_RISK")
-    panel["allocation_cross_state"] = panel["final_allocation_state"]
-    panel["final_regime_cross_state"] = panel["final_regime_confirmed"] + "_" + stress_flag.map(
-        {True: "STRESS", False: "NORMAL"}
-    )
+    panel = panel.copy()
+    panel["heatmap_cross_state"] = panel.apply(heatmap_cross_state, axis=1)
     panel.to_csv(OUT / "daily_backtest_panel.csv", index=False)
     panel.to_csv(TABLE_DIR / "daily_backtest_panel.csv", index=False)
+    panel.to_csv(TABLE_DIR / "final_daily_panel.csv", index=False)
+
     display_perf = perf.loc[perf["strategy"].isin(DISPLAY_STRATEGIES)].copy()
     display_perf.to_csv(TABLE_DIR / "strategy_performance_comparison.csv", index=False)
-    cross_behavior = asset_behavior(panel, "allocation_cross_state")
-    flat_behavior = asset_behavior(panel, "final_regime_confirmed")
+
+    cross_behavior = asset_behavior(panel, "heatmap_cross_state")
+    regime_behavior = asset_behavior(panel, "final_regime_confirmed")
     cross_behavior.to_csv(TABLE_DIR / "cross_state_asset_behavior.csv", index=False)
-    flat_behavior.to_csv(TABLE_DIR / "flat_low_high_asset_behavior.csv", index=False)
+    regime_behavior.to_csv(TABLE_DIR / "regime_asset_behavior.csv", index=False)
     crisis_performance(panel).to_csv(TABLE_DIR / "crisis_window_performance.csv", index=False)
+
     panel[["date"] + [f"{FINAL}_weight_{asset}" for asset in ASSETS]].to_csv(TABLE_DIR / "final_daily_weights.csv", index=False)
     panel[
         [
@@ -296,94 +441,124 @@ def main() -> None:
             "final_allocation_state",
             "trigger_lock_active_locks",
             "final_regime_confirmed",
-            "steep_rate_regime_confirmed",
+            "heatmap_cross_state",
         ]
     ].to_csv(TABLE_DIR / "final_daily_returns.csv", index=False)
+
     plot_outputs(panel)
     plot_performance_bars(display_perf)
     plot_case_studies(panel)
+
     plot_asset_behavior_heatmap(
         cross_behavior,
-        "allocation_cross_state",
+        "heatmap_cross_state",
         "cross_state_asset_behavior_heatmap.png",
-        "Asset Annualized Return by Final Allocation State",
+        "Asset Annualized Return by Final Cross-State Allocation",
     )
     plot_asset_behavior_heatmap(
         cross_behavior,
-        "allocation_cross_state",
+        "heatmap_cross_state",
         "cross_state_asset_sharpe_heatmap.png",
-        "Asset Sharpe Ratio by Final Allocation State",
+        "Asset Sharpe Ratio by Final Cross-State Allocation",
         value_col="Sharpe",
         value_label="Sharpe ratio",
         value_format="number",
     )
     plot_asset_behavior_heatmap(
-        flat_behavior,
+        regime_behavior,
         "final_regime_confirmed",
-        "flat_low_high_asset_behavior_heatmap.png",
+        "regime_asset_behavior_heatmap.png",
         "Asset Annualized Return by Final Regime",
     )
     plot_asset_behavior_heatmap(
-        flat_behavior,
+        regime_behavior,
         "final_regime_confirmed",
-        "flat_low_high_asset_sharpe_heatmap.png",
+        "regime_asset_sharpe_heatmap.png",
         "Asset Sharpe Ratio by Final Regime",
         value_col="Sharpe",
         value_label="Sharpe ratio",
         value_format="number",
     )
+
+    flat_gs10_summary = build_gs10_structure_outputs(
+        panel,
+        family="FLAT",
+        state_prefix="FLAT_",
+        band_lines=[
+            (1.1, "#ef4444", "mid->low 1.1"),
+            (1.3, "#f97316", "low->mid 1.3"),
+            (3.4, "#2563eb", "high->mid 3.4"),
+            (3.6, "#7c3aed", "mid->high 3.6"),
+        ],
+        fig_name="flat_gs10_kde_hmm.png",
+        table_prefix="flat_gs10",
+    )
+    steep_gs10_summary = build_gs10_structure_outputs(
+        panel,
+        family="STEEP",
+        state_prefix="STEEP_",
+        band_lines=[
+            (2.0, "#ef4444", "mid->low 2.0"),
+            (2.3, "#f97316", "low->mid 2.3"),
+            (3.0, "#2563eb", "high->mid 3.0"),
+            (3.2, "#7c3aed", "mid->high 3.2"),
+        ],
+        fig_name="steep_gs10_kde_hmm.png",
+        table_prefix="steep_gs10",
+    )
+
     readme = f"""# Final Source-Only Strategy Outputs
 
-This folder was generated from `data/raw` and `data/processed` only using the
-canonical source-only settings.
+This folder is generated from `data/raw` and `data/processed` only using the canonical source-only settings.
 
 Final display strategies:
 
 - `SPY_BUY_HOLD`: always 100% SPY.
-- `SPY_CASH_TIMING`: SPY in non-risk, CASH in full-risk; uses the same VIX/CREDIT anchor stress state as the final hedge strategy.
-- `FINAL_REGIME_HEDGE_TRIGGER_LOCK`: final hedge allocation with inverse-vol normal allocations and regime-specific trigger-lock stress hedges.
+- `SPY_CASH_TIMING`: SPY in non-risk, CASH in trigger-lock stress; uses the same VIX/CREDIT anchor state machine as the final hedge strategy.
+- `FINAL_REGIME_HEDGE_TRIGGER_LOCK`: final hedge allocation with six-regime classification, buffered regime transitions, and regime-specific stress sleeves.
 
 Key design choices:
+
 - Credit spread is daily `DBAA - DAAA`, filled to the trading calendar before feature construction.
-- Macro regime has no `NEUTRAL`: term spread maps every day to `INVERTED`,
-  `FLAT`, or `STEEP`, then uses 3-day confirmation.
-- FLAT is refined with GS10 threshold 3.0 into `FLAT_LOW_RATE` and
-  `FLAT_HIGH_RATE`.
-- STEEP normal is refined with GS1 threshold 0.3 into `STEEP_LOW_RATE`
-  and `STEEP_HIGH_RATE`; the low/high switch also uses 3-day confirmation.
+- Macro regime has no `NEUTRAL`: `INVERTED`, `FLAT`, `STEEP`, with `3-day confirm`.
+- `FLAT` uses buffered `GS10` low/mid/high bands:
+  - `MID -> LOW = 1.1`
+  - `LOW -> MID = 1.3`
+  - `HIGH -> MID = 3.4`
+  - `MID -> HIGH = 3.6`
+- `STEEP` uses buffered `GS10` low/mid/high bands:
+  - `MID -> LOW = 2.0`
+  - `LOW -> MID = 2.3`
+  - `HIGH -> MID = 3.0`
+  - `MID -> HIGH = 3.2`
+- `STEEP_LOW_RATE` does not allow native credit entries.
 - `CASH_return` uses geometric daily DTB3.
-- `CMDTY_RET60` uses synthetic commodity price from `CMDTY_FUT_return`.
-- `VIX_ZSCORE_120D` uses 120 trading days, current-day inclusive, `ddof=1`.
-- Inverse-vol window grid search showed limited sensitivity across reasonable settings; the final mainline uses 90 trading days.
+- Inverse-vol window is 90 trading days.
 - Transaction cost uses 10 bps one-way.
-- Recovery overlay exploration is not part of the final mainline.
 
 Final allocation settings:
+
 - `FLAT_LOW_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
-- `FLAT_LOW_RATE_STRESS`: 100% CASH.
+- `FLAT_MID_RATE_NORMAL`: SPY / GOLD inverse-vol.
+- `FLAT_LOWMID_RATE_STRESS`: 100% CASH.
 - `FLAT_HIGH_RATE_NORMAL`: GOLD / CMDTY_FUT inverse-vol.
-- `FLAT_HIGH_RATE_STRESS`: 100% IEF.
-- `STEEP_LOW_RATE_NORMAL`: 100% SPY.
-- `STEEP_LOW_RATE_STRESS`: 60% SPY / 40% IEF.
+- `FLAT_HIGH_RATE_STRESS`: 70% IEF + 30% (GOLD / CMDTY_FUT inverse-vol).
+- `STEEP_LOW_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
+- `STEEP_MID_RATE_NORMAL`: 100% SPY.
+- `STEEP_MID_RATE_STRESS`: 100% IEF.
 - `STEEP_HIGH_RATE_NORMAL`: SPY / GOLD / CMDTY_FUT inverse-vol.
-- `STEEP_HIGH_RATE_STRESS`: 10% CASH / 90% IEF.
+- `STEEP_HIGH_RATE_STRESS`: 100% IEF.
 - `INVERTED_NORMAL`: SPY / GOLD inverse-vol.
 - `INVERTED_STRESS`: 10% CASH + 90% (SPY / GOLD inverse-vol).
 
-How to run the current main sequence:
+Main run order:
 
-1. `python scripts/01_data_prepare.py`
-2. `python scripts/02_rule_based_regime.py`
-3. `python scripts/03_stress_detection.py`
-4. `python scripts/04_asset_return_panel.py`
-5. `python scripts/05_baseline_strategy.py`
-6. `python scripts/06_flat_rate_refined_strategy.py`
-7. `python scripts/07_cross_state_asset_behavior.py`
-8. `python scripts/08_stress_trigger_diagnostics.py`
-9. `python scripts/run_final_strategy_source_only.py`
-10. `python scripts/10_final_report_outputs.py`
+1. `python scripts/run_final_strategy_source_only.py`
+2. `python scripts/08_stress_trigger_diagnostics.py`
+3. `python scripts/10_final_report_outputs.py`
+4. `python scripts/hard_validate_main_pipeline_source_only.py`
 """
-    readme += stress_trigger_readme_section()
+    readme += stress_trigger_readme_section(flat_gs10_summary, steep_gs10_summary)
     (OUT / "README_final_strategy.md").write_text(readme, encoding="utf-8")
     print("PASS source-only final report outputs")
     print(display_perf.to_string(index=False))

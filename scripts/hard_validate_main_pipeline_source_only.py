@@ -54,8 +54,8 @@ SOURCE_INPUTS = {
     "dgs1": ROOT / "data" / "raw" / "macro" / "rate" / "DGS1.csv",
     "dtb3": ROOT / "data" / "raw" / "macro" / "rate" / "DTB3.csv",
     "vix": ROOT / "data" / "raw" / "macro" / "volatility" / "VIXCLS.csv",
-    "waaa": ROOT / "data" / "raw" / "macro" / "Credit" / "WAAA.csv",
-    "wbaa": ROOT / "data" / "raw" / "macro" / "Credit" / "WBAA.csv",
+    "daaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DAAA.csv",
+    "dbaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DBAA.csv",
 }
 
 REFERENCE_PANEL = ROOT / "results" / "main_pipeline_final" / "tables" / "final_daily_returns.csv"
@@ -412,14 +412,16 @@ definition of correctness.
 
 ## Canonical Intentional Differences
 
-- `CREDIT_SPREAD_BAA_AAA` now comes directly from raw `WBAA - WAAA`, aligned to
+- `CREDIT_SPREAD_BAA_AAA` now comes directly from raw daily `DBAA - DAAA`, aligned to
   trading days and forward-filled. Old processed/intermediate credit panels under
   `results/` are intentionally not used.
 - `macro_regime_confirmed` no longer allows `NEUTRAL`; it is confirmed from the
   term-spread regimes `INVERTED`, `FLAT`, and `STEEP` with 3-day confirmation
   initialized from the first raw regime.
-- FLAT can be split into `FLAT_LOW_RATE` and `FLAT_HIGH_RATE` for allocation via
-  the canonical GS10 threshold of 3.0.
+- `FLAT` and `STEEP` are internally split with buffered GS10 hysteresis:
+  - `FLAT`: `1.1 / 1.3 / 3.4 / 3.6`
+  - `STEEP`: `2.0 / 2.3 / 3.0 / 3.2`
+  and 3-day confirmation.
 
 ## Bug Fixes / Canonical Formula Fixes
 
