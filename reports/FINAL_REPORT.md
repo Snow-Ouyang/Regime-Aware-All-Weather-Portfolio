@@ -8,7 +8,7 @@ Final strategies:
 |---|---:|---:|---:|---:|---:|---:|
 | SPY_BUY_HOLD | 11.14% | 0.575 | 0.702 | -55.19% | 0.202 | 8.38 |
 | SPY_CASH_TIMING | 14.09% | 1.280 | 1.420 | -14.60% | 0.965 | 14.22 |
-| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 21.41% | 1.745 | 2.227 | -12.49% | 1.714 | 49.73 |
+| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 21.98% | 1.789 | 2.285 | -12.49% | 1.759 | 54.62 |
 
 This is now the canonical source-only mainline.
 
@@ -91,7 +91,7 @@ The mainline uses a VIX/CREDIT anchor state machine.
 - `STEEP_HIGH_RATE`
 - `INVERTED`
 
-`STEEP_LOW_RATE` has no native trigger. If the strategy is still in stress while the regime transitions into `STEEP_LOW_RATE`, that is treated as carry-over rather than as a distinct trigger-enabled stress bucket.
+`STEEP_LOW_RATE` has no native trigger. If the strategy is still in stress while the regime transitions into `STEEP_LOW_RATE`, that is treated as carry-over rather than as a distinct trigger-enabled stress bucket. While `FULL_RISK` is active, carry-over may remap to the new regime's stress sleeve, but it may not revert to any normal sleeve until unlock.
 
 ### Rules
 
@@ -135,7 +135,7 @@ Final heatmap buckets:
 
 Important handling:
 - `FLAT_LOW_RATE_STRESS` and `FLAT_MID_RATE_STRESS` are merged into `FLAT_LOWMID_RATE_STRESS`.
-- `STEEP_LOW_RATE_STRESS` is not drawn as a separate heatmap bucket because there is no native trigger there. Any such days are carry-over and use the same sleeve as `STEEP_LOW_RATE_NORMAL`.
+- `STEEP_LOW_RATE_STRESS` is not drawn as a separate heatmap bucket because there is no native trigger there. Any such days are carry-over, but they still remain on a stress sleeve until unlock.
 
 Current sample sizes:
 - `FLAT_LOW_RATE_NORMAL`: `193`
@@ -161,6 +161,7 @@ Current sample sizes:
 | `FLAT_HIGH_RATE_NORMAL` | `GOLD + CMDTY_FUT` inverse-vol |
 | `FLAT_HIGH_RATE_STRESS` | `70% IEF + 30% (GOLD + CMDTY_FUT inverse-vol)` |
 | `STEEP_LOW_RATE_NORMAL` | `SPY + CMDTY_FUT` inverse-vol |
+| `STEEP_LOW_RATE_STRESS` | `100% SPY` |
 | `STEEP_MID_RATE_NORMAL` | `100% SPY` |
 | `STEEP_MID_RATE_STRESS` | `100% IEF` |
 | `STEEP_HIGH_RATE_NORMAL` | `SPY + GOLD + CMDTY_FUT` inverse-vol |
@@ -173,13 +174,21 @@ Current sample sizes:
 | Window | SPY_CASH_TIMING | FINAL_REGIME_HEDGE_TRIGGER_LOCK |
 |---|---:|---:|
 | 2008_GFC | `+7.40%`, MaxDD `-8.17%` | `+44.42%`, MaxDD `-6.18%` |
-| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+10.34%`, MaxDD `-11.00%` |
-| 2015_2016 | `+3.24%`, MaxDD `-3.32%` | `+13.33%`, MaxDD `-7.22%` |
+| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+18.06%`, MaxDD `-9.54%` |
+| 2015_2016 | `+3.24%`, MaxDD `-3.32%` | `+17.18%`, MaxDD `-5.70%` |
 | COVID_2020 | `+17.01%`, MaxDD `-6.99%` | `+20.59%`, MaxDD `-10.41%` |
 | 2022_RATE_WAR | `+3.79%`, MaxDD `-9.73%` | `+14.80%`, MaxDD `-10.29%` |
 | 2025_PULLBACK | `+11.58%`, MaxDD `-14.60%` | `+21.18%`, MaxDD `-6.18%` |
 
 The final strategy is not only safer than SPY buy-and-hold. It also compounds better than the aligned SPY/CASH timing benchmark.
+
+Mainline crisis figures:
+- [2008 GFC](../results/main_pipeline_final/figures/case_2008_GFC_final.png)
+- [2011 Euro Debt](../results/main_pipeline_final/figures/case_2011_euro_debt_final.png)
+- [2015-2016](../results/main_pipeline_final/figures/case_2015_2016_final.png)
+- [COVID 2020](../results/main_pipeline_final/figures/case_2020_covid_final.png)
+- [2022 Rate War](../results/main_pipeline_final/figures/case_2022_rate_war_final.png)
+- [2025 Pullback](../results/main_pipeline_final/figures/case_2025_pullback_final.png)
 
 ## 8. Source-Only Reproducibility
 

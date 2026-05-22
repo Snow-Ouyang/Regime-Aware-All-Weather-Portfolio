@@ -23,6 +23,7 @@ Key design choices:
   - `HIGH -> MID = 3.0`
   - `MID -> HIGH = 3.2`
 - `STEEP_LOW_RATE` does not allow native credit entries.
+- If a `FULL_RISK` episode carries into a new regime, the strategy stays on a stress sleeve until unlock. Carry-over may adopt the new regime's stress sleeve, but it cannot revert to normal during `FULL_RISK`.
 - `CASH_return` uses geometric daily DTB3.
 - Inverse-vol window is 90 trading days.
 - Transaction cost uses 10 bps one-way.
@@ -35,6 +36,7 @@ Final allocation settings:
 - `FLAT_HIGH_RATE_NORMAL`: GOLD / CMDTY_FUT inverse-vol.
 - `FLAT_HIGH_RATE_STRESS`: 70% IEF + 30% (GOLD / CMDTY_FUT inverse-vol).
 - `STEEP_LOW_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
+- `STEEP_LOW_RATE_STRESS`: 100% SPY.
 - `STEEP_MID_RATE_NORMAL`: 100% SPY.
 - `STEEP_MID_RATE_STRESS`: 100% IEF.
 - `STEEP_HIGH_RATE_NORMAL`: SPY / GOLD / CMDTY_FUT inverse-vol.

@@ -354,8 +354,9 @@ def stress_allocation_by_regime(
         base = flat_high_stress_gc.loc[i].to_dict()
         return mixed_inv_vol_row(base, {"IEF": 0.70}), "FLAT_HIGH_RATE_STRESS"
     if final_regime == "STEEP_LOW_RATE":
-        # Credit is disabled here. Any residual stress is a carry-over, not a native steep-low stress state.
-        return steep_low_normal.loc[i].to_dict(), "STEEP_LOW_RATE_NORMAL"
+        # No native trigger is allowed in steep-low, but an existing FULL_RISK episode
+        # must remain on a stress sleeve until the locks actually unlock.
+        return {"SPY": 1.0}, "STEEP_LOW_RATE_STRESS"
     if final_regime in {"STEEP_MID_RATE", "STEEP_HIGH_RATE"}:
         return {"IEF": 1.0}, f"{final_regime}_STRESS"
     if final_regime == "INVERTED":

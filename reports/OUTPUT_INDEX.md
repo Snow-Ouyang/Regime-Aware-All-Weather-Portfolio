@@ -26,6 +26,12 @@ This index reflects the current source-only mainline after the buffered `FLAT/ST
 | `results/main_pipeline_final/figures/final_strategy_weights_timeline.png` | figure | Final strategy weight timeline. |
 | `results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png` | figure | Final heatmap of annualized return by cross-state bucket. |
 | `results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png` | figure | Final heatmap of Sharpe by cross-state bucket. |
+| `results/main_pipeline_final/figures/case_2008_GFC_final.png` | figure | Crisis-window strategy comparison for 2008 GFC. |
+| `results/main_pipeline_final/figures/case_2011_euro_debt_final.png` | figure | Crisis-window strategy comparison for 2011 Euro debt. |
+| `results/main_pipeline_final/figures/case_2015_2016_final.png` | figure | Crisis-window strategy comparison for 2015-2016. |
+| `results/main_pipeline_final/figures/case_2020_covid_final.png` | figure | Crisis-window strategy comparison for COVID 2020. |
+| `results/main_pipeline_final/figures/case_2022_rate_war_final.png` | figure | Crisis-window strategy comparison for 2022 rate war. |
+| `results/main_pipeline_final/figures/case_2025_pullback_final.png` | figure | Crisis-window strategy comparison for 2025 pullback. |
 | `results/main_pipeline_final/figures/regime_asset_behavior_heatmap.png` | figure | Annualized return by regime. |
 | `results/main_pipeline_final/figures/regime_asset_sharpe_heatmap.png` | figure | Sharpe by regime. |
 | `results/main_pipeline_final/figures/flat_gs10_kde_hmm.png` | figure | FLAT-only GS10 KDE + HMM diagnostic. |

@@ -10,7 +10,7 @@ This repo now uses a buffered multi-state macro classification together with a V
 |---|---:|---:|---:|---:|---:|---:|
 | SPY_BUY_HOLD | 11.14% | 0.575 | 0.702 | -55.19% | 0.202 | 8.38 |
 | SPY_CASH_TIMING | 14.09% | 1.280 | 1.420 | -14.60% | 0.965 | 14.22 |
-| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 21.41% | 1.745 | 2.227 | -12.49% | 1.714 | 49.73 |
+| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 21.98% | 1.789 | 2.285 | -12.49% | 1.759 | 54.62 |
 
 Relative to SPY buy-and-hold, the final strategy materially improves return and drawdown. Relative to the matching `SPY_CASH_TIMING` benchmark, it keeps the improved timing state machine and compounds more efficiently through regime-specific allocation.
 
@@ -85,6 +85,7 @@ The final timing module is a **VIX/CREDIT anchor state machine**:
   - `STEEP_HIGH_RATE`
   - `INVERTED`
 - `STEEP_LOW_RATE` has **no native trigger**. If stress appears there, it is carry-over from another regime and is not treated as a standalone trigger-enabled stress block.
+- If a stress period carries into a new regime, the strategy stays on a **stress sleeve** until the locks truly unlock. Regime shift may remap stress to a new regime's stress sleeve, but it never falls back to a normal sleeve while `FULL_RISK` is still active.
 
 ### Trigger rules
 
@@ -125,6 +126,7 @@ Final sleeves:
 | `FLAT_HIGH_RATE_NORMAL` | `GOLD + CMDTY_FUT` inverse-vol |
 | `FLAT_HIGH_RATE_STRESS` | `70% IEF + 30% (GOLD + CMDTY_FUT inverse-vol)` |
 | `STEEP_LOW_RATE_NORMAL` | `SPY + CMDTY_FUT` inverse-vol |
+| `STEEP_LOW_RATE_STRESS` | `100% SPY` |
 | `STEEP_MID_RATE_NORMAL` | `100% SPY` |
 | `STEEP_MID_RATE_STRESS` | `100% IEF` |
 | `STEEP_HIGH_RATE_NORMAL` | `SPY + GOLD + CMDTY_FUT` inverse-vol |
@@ -134,7 +136,7 @@ Final sleeves:
 
 Notes:
 - `FLAT_LOW_RATE_STRESS` and `FLAT_MID_RATE_STRESS` are merged into `FLAT_LOWMID_RATE_STRESS` in the mainline heatmap because the low block was too small by itself.
-- `STEEP_LOW_RATE_STRESS` is not shown as a standalone heatmap block. If stress persists there, it is carry-over and the strategy keeps the same sleeve as `STEEP_LOW_RATE_NORMAL`.
+- `STEEP_LOW_RATE_STRESS` is carry-over only. It has no native trigger, but once a stress period enters `STEEP_LOW_RATE`, it remains on a stress sleeve rather than reverting to normal before unlock.
 
 ## Heatmap Evidence
 
@@ -165,13 +167,23 @@ Current heatmap buckets and sample sizes:
 | Window | SPY_CASH_TIMING | FINAL_REGIME_HEDGE_TRIGGER_LOCK |
 |---|---:|---:|
 | 2008_GFC | `+7.40%`, MaxDD `-8.17%` | `+44.42%`, MaxDD `-6.18%` |
-| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+10.34%`, MaxDD `-11.00%` |
-| 2015_2016 | `+3.24%`, MaxDD `-3.32%` | `+13.33%`, MaxDD `-7.22%` |
+| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+18.06%`, MaxDD `-9.54%` |
+| 2015_2016 | `+3.24%`, MaxDD `-3.32%` | `+17.18%`, MaxDD `-5.70%` |
 | COVID_2020 | `+17.01%`, MaxDD `-6.99%` | `+20.59%`, MaxDD `-10.41%` |
 | 2022_RATE_WAR | `+3.79%`, MaxDD `-9.73%` | `+14.80%`, MaxDD `-10.29%` |
 | 2025_PULLBACK | `+11.58%`, MaxDD `-14.60%` | `+21.18%`, MaxDD `-6.18%` |
 
 The final strategy improves compounding on top of the new timing logic without giving up stress control.
+
+Representative crisis-window figures from the mainline outputs:
+
+![2008 GFC](results/main_pipeline_final/figures/case_2008_GFC_final.png)
+
+![2011 Euro Debt](results/main_pipeline_final/figures/case_2011_euro_debt_final.png)
+
+![COVID 2020](results/main_pipeline_final/figures/case_2020_covid_final.png)
+
+![2022 Rate War](results/main_pipeline_final/figures/case_2022_rate_war_final.png)
 
 ## Source-Only Mainline
 
