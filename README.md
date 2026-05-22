@@ -28,9 +28,7 @@ Inside `FLAT` and `STEEP`, the final mainline now uses **GS10 hysteresis bands**
 
 ### FLAT GS10 structure
 
-Mainline diagnostic:
-- [figure](results/main_pipeline_final/figures/flat_gs10_kde_hmm.png)
-- [summary table](results/main_pipeline_final/tables/flat_gs10_hmm_summary.csv)
+![FLAT GS10 KDE and HMM](results/main_pipeline_final/figures/flat_gs10_kde_hmm.png)
 
 HMM mean GS10 levels:
 - `LOW`: `1.02`
@@ -45,9 +43,7 @@ Final bands:
 
 ### STEEP GS10 structure
 
-Mainline diagnostic:
-- [figure](results/main_pipeline_final/figures/steep_gs10_kde_hmm.png)
-- [summary table](results/main_pipeline_final/tables/steep_gs10_hmm_summary.csv)
+![STEEP GS10 KDE and HMM](results/main_pipeline_final/figures/steep_gs10_kde_hmm.png)
 
 HMM mean GS10 levels:
 - `LOW`: `1.79`
@@ -142,10 +138,9 @@ Notes:
 
 ## Heatmap Evidence
 
-Mainline outputs:
-- [cross-state return heatmap](results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
-- [cross-state Sharpe heatmap](results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
-- [cross-state asset table](results/main_pipeline_final/tables/cross_state_asset_behavior.csv)
+![Cross-state return heatmap](results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
+
+![Cross-state Sharpe heatmap](results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
 
 These heatmaps are part of the main thesis:
 1. macro data itself has internal structure, so `FLAT` and `STEEP` should not be forced into one coarse low/high split;
