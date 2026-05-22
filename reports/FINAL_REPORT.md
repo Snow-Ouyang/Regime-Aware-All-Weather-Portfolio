@@ -36,8 +36,8 @@ Internal splits use `GS10`.
 ### FLAT
 
 Diagnostic outputs:
-- [flat GS10 KDE/HMM](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/flat_gs10_kde_hmm.png)
-- [flat GS10 HMM summary](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/tables/flat_gs10_hmm_summary.csv)
+- [flat GS10 KDE/HMM](../results/main_pipeline_final/figures/flat_gs10_kde_hmm.png)
+- [flat GS10 HMM summary](../results/main_pipeline_final/tables/flat_gs10_hmm_summary.csv)
 
 HMM mean levels:
 - `LOW = 1.02`
@@ -53,8 +53,8 @@ Bands:
 ### STEEP
 
 Diagnostic outputs:
-- [steep GS10 KDE/HMM](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/steep_gs10_kde_hmm.png)
-- [steep GS10 HMM summary](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/tables/steep_gs10_hmm_summary.csv)
+- [steep GS10 KDE/HMM](../results/main_pipeline_final/figures/steep_gs10_kde_hmm.png)
+- [steep GS10 HMM summary](../results/main_pipeline_final/tables/steep_gs10_hmm_summary.csv)
 
 HMM mean levels:
 - `LOW = 1.79`
@@ -115,9 +115,9 @@ The first trigger that starts stress is the anchor trigger for exit.
 ## 5. Heatmap Logic
 
 Mainline heatmap outputs:
-- [cross-state return heatmap](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
-- [cross-state Sharpe heatmap](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
-- [cross-state asset table](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/tables/cross_state_asset_behavior.csv)
+- [cross-state return heatmap](../results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
+- [cross-state Sharpe heatmap](../results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
+- [cross-state asset table](../results/main_pipeline_final/tables/cross_state_asset_behavior.csv)
 
 Final heatmap buckets:
 - `FLAT_LOW_RATE_NORMAL`

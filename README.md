@@ -4,7 +4,7 @@
 
 This repo now uses a buffered multi-state macro classification together with a VIX/CREDIT anchor stress state machine and regime-specific hedge sleeves.
 
-![Final equity curve](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/final_equity_curve_comparison.png)
+![Final equity curve](results/main_pipeline_final/figures/final_equity_curve_comparison.png)
 
 | Strategy | CAGR | Sharpe | Sortino | MaxDD | Calmar | Final Equity |
 |---|---:|---:|---:|---:|---:|---:|
@@ -29,8 +29,8 @@ Inside `FLAT` and `STEEP`, the final mainline now uses **GS10 hysteresis bands**
 ### FLAT GS10 structure
 
 Mainline diagnostic:
-- [figure](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/flat_gs10_kde_hmm.png)
-- [summary table](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/tables/flat_gs10_hmm_summary.csv)
+- [figure](results/main_pipeline_final/figures/flat_gs10_kde_hmm.png)
+- [summary table](results/main_pipeline_final/tables/flat_gs10_hmm_summary.csv)
 
 HMM mean GS10 levels:
 - `LOW`: `1.02`
@@ -46,8 +46,8 @@ Final bands:
 ### STEEP GS10 structure
 
 Mainline diagnostic:
-- [figure](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/steep_gs10_kde_hmm.png)
-- [summary table](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/tables/steep_gs10_hmm_summary.csv)
+- [figure](results/main_pipeline_final/figures/steep_gs10_kde_hmm.png)
+- [summary table](results/main_pipeline_final/tables/steep_gs10_hmm_summary.csv)
 
 HMM mean GS10 levels:
 - `LOW`: `1.79`
@@ -143,9 +143,9 @@ Notes:
 ## Heatmap Evidence
 
 Mainline outputs:
-- [cross-state return heatmap](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
-- [cross-state Sharpe heatmap](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
-- [cross-state asset table](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/tables/cross_state_asset_behavior.csv)
+- [cross-state return heatmap](results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
+- [cross-state Sharpe heatmap](results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
+- [cross-state asset table](results/main_pipeline_final/tables/cross_state_asset_behavior.csv)
 
 These heatmaps are part of the main thesis:
 1. macro data itself has internal structure, so `FLAT` and `STEEP` should not be forced into one coarse low/high split;
@@ -190,9 +190,9 @@ python scripts/hard_validate_main_pipeline_source_only.py
 ```
 
 Mainline outputs:
-- [results/main_pipeline_final/README_final_strategy.md](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/README_final_strategy.md)
-- [strategy table](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/results/main_pipeline_final/tables/strategy_performance_comparison.csv)
-- [final report](C:/Users/FeixueOuyang/Desktop/research lab/all weather portfolio/reports/FINAL_REPORT.md)
+- [results/main_pipeline_final/README_final_strategy.md](results/main_pipeline_final/README_final_strategy.md)
+- [strategy table](results/main_pipeline_final/tables/strategy_performance_comparison.csv)
+- [final report](reports/FINAL_REPORT.md)
 
 ## Limitations
 
