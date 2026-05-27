@@ -22,13 +22,11 @@ Relative to SPY buy-and-hold, the final strategy materially improves return and 
 
 ## Live Regime Dashboard
 
-In addition to the full historical backtest, this project also generates a live regime dashboard for the most recent macro regime.
+👉 [Open the Live Regime Dashboard](./results/main_pipeline_final/live_regime_dashboard.html)
 
-👉 [Open the Live Regime Dashboard](results/live_regime_dashboard/live_regime_dashboard.html)
+This dashboard shows the most recent macro regime, current stress state, target allocation, dynamic regime-to-date weights, rebalance dates, signal-distance monitors, stress episodes, and regime-to-date performance versus SPY.
 
-The dashboard summarizes the current macro regime, stress state, target allocation, dynamic regime-to-date weights, rebalance dates, signal-distance monitors, stress episodes, and regime-to-date performance versus SPY.
-
-This view is intended to make the strategy easier to inspect as a live allocation framework rather than only a static historical backtest.
+It turns the historical backtest into a live allocation monitoring view for the current regime.
 
 ## Regime Construction
 
