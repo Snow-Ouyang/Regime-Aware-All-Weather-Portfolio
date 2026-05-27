@@ -4,6 +4,12 @@
 
 This repo now uses a buffered multi-state macro classification together with a VIX/CREDIT anchor stress state machine and regime-specific hedge sleeves.
 
+Final strategy summary:
+- Macro regime: yield-curve shape plus GS10 low/mid/high hysteresis states.
+- Stress timing: VIX and credit-spread trigger-lock state machine.
+- Allocation: regime-specific inverse-vol or fixed hedge sleeves.
+- Main result: `FINAL_REGIME_HEDGE_TRIGGER_LOCK` reaches `22.20%` CAGR, `1.808` Sharpe, and `-12.49%` MaxDD in the source-only mainline backtest.
+
 ![Final equity curve](results/main_pipeline_final/figures/final_equity_curve_comparison.png)
 
 | Strategy | CAGR | Sharpe | Sortino | MaxDD | Calmar | Final Equity |
@@ -13,6 +19,16 @@ This repo now uses a buffered multi-state macro classification together with a V
 | FINAL_REGIME_HEDGE_TRIGGER_LOCK | 22.20% | 1.808 | 2.303 | -12.49% | 1.776 | 56.61 |
 
 Relative to SPY buy-and-hold, the final strategy materially improves return and drawdown. Relative to the matching `SPY_CASH_TIMING` benchmark, it keeps the improved timing state machine and compounds more efficiently through regime-specific allocation.
+
+## Live Regime Dashboard
+
+In addition to the full historical backtest, this project also generates a live regime dashboard for the most recent macro regime.
+
+👉 [Open the Live Regime Dashboard](results/live_regime_dashboard/live_regime_dashboard.html)
+
+The dashboard summarizes the current macro regime, stress state, target allocation, dynamic regime-to-date weights, rebalance dates, signal-distance monitors, stress episodes, and regime-to-date performance versus SPY.
+
+This view is intended to make the strategy easier to inspect as a live allocation framework rather than only a static historical backtest.
 
 ## Regime Construction
 
