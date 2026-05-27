@@ -1,0 +1,6 @@
+date,state,asset,weight,allocation_method,realized_vol,inverse_vol_raw_weight,reason
+2026-05-26,FLAT_HIGH_RATE_NORMAL,SPY,0.0,inverse_vol_monthly_hold,0.14104734622590032,,normal allocation for FLAT_HIGH_RATE
+2026-05-26,FLAT_HIGH_RATE_NORMAL,GOLD,0.4814872366937784,inverse_vol_monthly_hold,0.3641534625412437,0.4982318901999345,normal allocation for FLAT_HIGH_RATE
+2026-05-26,FLAT_HIGH_RATE_NORMAL,CMDTY_FUT,0.5185127633062215,inverse_vol_monthly_hold,0.36158708459385486,0.5017681098000654,normal allocation for FLAT_HIGH_RATE
+2026-05-26,FLAT_HIGH_RATE_NORMAL,IEF,0.0,inverse_vol_monthly_hold,0.0524197516415102,,normal allocation for FLAT_HIGH_RATE
+2026-05-26,FLAT_HIGH_RATE_NORMAL,CASH,0.0,inverse_vol_monthly_hold,8.32759163195895e-06,,"cash sleeve uses FRED 3-month T-bill daily accrual (DTB3, or TB3MS fallback)"

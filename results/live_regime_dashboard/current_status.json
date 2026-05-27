@@ -1,0 +1,162 @@
+{
+  "latest_date": "2026-05-26",
+  "current_regime": "FLAT_HIGH_RATE",
+  "stress_state": "NON_RISK",
+  "active_locks": [],
+  "active_trigger_reason": "",
+  "regime_start_date": "2024-12-11",
+  "days_in_regime": 531,
+  "current_stress_start_date": null,
+  "days_in_current_stress": null,
+  "current_allocation": {
+    "SPY": 0.0,
+    "GOLD": 0.4814872366937784,
+    "CMDTY_FUT": 0.5185127633062215,
+    "IEF": 0.0,
+    "CASH": 0.0
+  },
+  "regime_to_date": {
+    "strategy_return": 0.43058516849956385,
+    "spy_return": 0.2871383473418463,
+    "excess_return": 0.14344682115771756,
+    "strategy_max_drawdown": -0.08797658983502676,
+    "spy_max_drawdown": -0.18755246925491054,
+    "strategy_current_drawdown": -0.05625550106091004,
+    "spy_current_drawdown": 0.0
+  },
+  "signals": {
+    "vix_zscore": [
+      {
+        "category": "VIX",
+        "signal": "VIX Z-score",
+        "current_value": -0.5990724239199838,
+        "threshold_name": "entry",
+        "threshold_value": 3.0,
+        "distance": -3.599072423919984,
+        "condition_met": false,
+        "status": "below entry",
+        "interpretation": "VIX stress entry is active at or above 3.0 z-score."
+      },
+      {
+        "category": "VIX",
+        "signal": "VIX Z-score",
+        "current_value": -0.5990724239199838,
+        "threshold_name": "unlock",
+        "threshold_value": 1.5,
+        "distance": -2.099072423919984,
+        "condition_met": true,
+        "status": "unlock condition met",
+        "interpretation": "VIX lock unlock also requires SPY above MA20."
+      }
+    ],
+    "credit": [
+      {
+        "category": "Credit",
+        "signal": "Credit 15D change",
+        "current_value": -0.05999999999999961,
+        "threshold_name": "entry",
+        "threshold_value": 0.1,
+        "distance": -0.15999999999999961,
+        "condition_met": false,
+        "status": "below entry",
+        "interpretation": "Credit lock entry also requires SPY below MA20."
+      },
+      {
+        "category": "Credit",
+        "signal": "Credit level Z",
+        "current_value": -1.4424057153930294,
+        "threshold_name": "unlock",
+        "threshold_value": 0.9,
+        "distance": -2.3424057153930296,
+        "condition_met": true,
+        "status": "unlock condition met",
+        "interpretation": "Credit unlock also requires SPY above MA50."
+      }
+    ],
+    "spy_trend": [
+      {
+        "category": "SPY trend",
+        "signal": "SPY vs MA20",
+        "current_value": 750.5900268554688,
+        "threshold_name": "MA20",
+        "threshold_value": 733.3550018310547,
+        "distance": 17.235025024414085,
+        "condition_met": true,
+        "status": "above MA20",
+        "interpretation": "Positive distance means SPY is above MA20."
+      },
+      {
+        "category": "SPY trend",
+        "signal": "SPY vs MA50",
+        "current_value": 750.5900268554688,
+        "threshold_name": "MA50",
+        "threshold_value": 698.29625,
+        "distance": 52.293776855468764,
+        "condition_met": true,
+        "status": "above MA50",
+        "interpretation": "Positive distance means SPY is above MA50."
+      },
+      {
+        "category": "SPY trend",
+        "signal": "SPY drawdown from previous high",
+        "current_value": 0.0,
+        "threshold_name": "drawdown monitor",
+        "threshold_value": -0.05,
+        "distance": 0.05,
+        "condition_met": false,
+        "status": "above drawdown monitor",
+        "interpretation": "Drawdown is monitored as context for risk stress."
+      }
+    ],
+    "regime_variables": [
+      {
+        "category": "Regime variables",
+        "signal": "Term spread boundary",
+        "current_value": 0.6999999999999997,
+        "threshold_name": "flat/steep split",
+        "threshold_value": 1.0,
+        "distance": -0.30000000000000027,
+        "condition_met": false,
+        "status": "FLAT/INVERTED side",
+        "interpretation": "Above 1.0 is raw STEEP; below 0 is raw INVERTED."
+      },
+      {
+        "category": "Regime variables",
+        "signal": "Nearest regime boundary",
+        "current_value": 0.6999999999999997,
+        "threshold_name": "term spread flat/steep boundary",
+        "threshold_value": 1.0,
+        "distance": -0.30000000000000027,
+        "condition_met": false,
+        "status": "away from boundary",
+        "interpretation": "Current regime is FLAT_HIGH_RATE; nearest boundary is term spread flat/steep boundary."
+      }
+    ]
+  },
+  "data_freshness": {
+    "fred": {
+      "DTB3": "2026-05-22",
+      "DBAA": "2026-05-21",
+      "DAAA": "2026-05-21",
+      "DGS10": "2026-05-22",
+      "DGS1": "2026-05-22",
+      "VIXCLS": "2026-05-25"
+    },
+    "assets": {
+      "SPY": "2026-05-26",
+      "GOLD": "2026-05-26",
+      "CMDTY_FUT": "2026-05-26",
+      "IEF": "2026-05-26",
+      "CASH": "2026-05-22"
+    }
+  },
+  "warnings": [
+    "DTB3 latest date 2026-05-22 lags newest available data date 2026-05-26.",
+    "DBAA latest date 2026-05-21 lags newest available data date 2026-05-26.",
+    "DAAA latest date 2026-05-21 lags newest available data date 2026-05-26.",
+    "DGS10 latest date 2026-05-22 lags newest available data date 2026-05-26.",
+    "DGS1 latest date 2026-05-22 lags newest available data date 2026-05-26.",
+    "CASH latest date 2026-05-22 lags newest available data date 2026-05-26.",
+    "VIXCLS latest date 2026-05-25 is earlier than SPY 2026-05-26; using common strategy panel date 2026-05-26."
+  ]
+}
