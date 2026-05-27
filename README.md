@@ -22,7 +22,7 @@ Relative to SPY buy-and-hold, the final strategy materially improves return and 
 
 ## Live Regime Dashboard
 
-👉 [Open the Live Regime Dashboard](./results/live_regime_dashboard/live_regime_dashboard.html)
+👉 [Open the Live Regime Dashboard](https://snow-ouyang.github.io/Regime-Aware-All-Weather-Portfolio/)
 
 This dashboard shows the most recent macro regime, current stress state, target allocation, dynamic regime-to-date weights, rebalance dates, signal-distance monitors, stress episodes, and regime-to-date performance versus SPY.
 
