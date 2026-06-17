@@ -1,76 +1,113 @@
-# Regime-Aware Stress Timing and Hedge Allocation Strategy
+# Regime-Aware All Weather Portfolio
 
-## Final Result
+This repository now centers on the current mainline strategy:
 
-This repo now uses a buffered multi-state macro classification together with a VIX/CREDIT anchor stress state machine and regime-specific hedge sleeves.
+- outer macro regime from `DGS10 - DGS1` with hysteresis
+- inner rate detail from `GS10` low/mid/high structure
+- original mainline `VIX + credit` stress trigger-lock timing
+- oil level `HIGH / MID / LOW` overlay for flat sleeves
+- expanded asset set: `SPY`, `GOLD`, `IEF`, `DBC`, `DBB`, `DBA`, `CASH`
 
-Final strategy summary:
-- Macro regime: yield-curve shape plus GS10 low/mid/high hysteresis states.
-- Stress timing: VIX and credit-spread trigger-lock state machine.
-- Allocation: regime-specific inverse-vol or fixed hedge sleeves.
-- Main result: `FINAL_REGIME_HEDGE_TRIGGER_LOCK` reaches `22.20%` CAGR, `1.808` Sharpe, and `-12.49%` MaxDD in the source-only mainline backtest.
+The canonical implementation is source-only and rebuilds directly from `data/raw` and `data/processed`.
+
+## Final Mainline Result
+
+Sample window:
+
+- Start: `2007-01-08`
+- End: `2026-06-12`
+- Trading days: `4886`
+
+Headline result for `FINAL_REGIME_HEDGE_TRIGGER_LOCK`:
+
+- CAGR: `22.09%`
+- Annualized volatility: `11.13%`
+- Sharpe: `1.984`
+- Max drawdown: `-9.73%`
+- Final equity multiple: `47.91x`
 
 ![Final equity curve](results/main_pipeline_final/figures/final_equity_curve_comparison.png)
 
 | Strategy | CAGR | Sharpe | Sortino | MaxDD | Calmar | Final Equity |
 |---|---:|---:|---:|---:|---:|---:|
-| SPY_BUY_HOLD | 11.14% | 0.575 | 0.702 | -55.19% | 0.202 | 8.38 |
-| SPY_CASH_TIMING | 14.09% | 1.280 | 1.420 | -14.60% | 0.965 | 14.22 |
-| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 22.20% | 1.808 | 2.303 | -12.49% | 1.776 | 56.61 |
+| SPY_BUY_HOLD | 11.06% | 0.563 | 0.687 | -55.19% | 0.200 | 7.64 |
+| SPY_CASH_TIMING | 14.23% | 1.278 | 1.412 | -14.60% | 0.975 | 13.19 |
+| FINAL_REGIME_HEDGE_TRIGGER_LOCK | 22.09% | 1.984 | 2.643 | -9.73% | 2.271 | 47.91 |
 
-Relative to SPY buy-and-hold, the final strategy materially improves return and drawdown. Relative to the matching `SPY_CASH_TIMING` benchmark, it keeps the improved timing state machine and compounds more efficiently through regime-specific allocation.
+## Live Dashboard
 
-## Live Regime Dashboard
+[Open the Live Regime Dashboard](https://snow-ouyang.github.io/Regime-Aware-All-Weather-Portfolio/)
 
-👉 [Open the Live Regime Dashboard](https://snow-ouyang.github.io/Regime-Aware-All-Weather-Portfolio/)
+The dashboard is the live view of the same mainline logic. It shows:
 
-This dashboard shows the most recent macro regime, current stress state, target allocation, dynamic regime-to-date weights, rebalance dates, signal-distance monitors, stress episodes, and regime-to-date performance versus SPY.
+- current macro regime
+- current stress state and active locks
+- current oil level
+- target allocation
+- signal-distance monitors for term spread, oil, VIX, credit, and SPY trend
+- regime-to-date performance versus SPY
 
-It turns the historical backtest into a live allocation monitoring view for the current regime.
+The publishing source is `docs/index.html`, generated from `results/live_regime_dashboard/live_regime_dashboard.html`.
 
 ## Regime Construction
 
-The first layer remains yield-curve shape:
+### Outer Term Spread Hysteresis
 
-`term_spread = GS10 - GS1`
+The first layer is the 10Y-1Y term spread:
 
-- `INVERTED`: `term_spread < 0`
-- `FLAT`: `0 <= term_spread <= 1`
-- `STEEP`: `term_spread > 1`
+`term_spread = DGS10 - DGS1`
 
-Inside `FLAT` and `STEEP`, the final mainline now uses **GS10 hysteresis bands** with `3-day confirm`. This replaced the older single-threshold low/high split because the full-sample GS10 distribution showed a stable three-state internal structure.
+This is no longer a single-threshold split. The mainline uses buffered transitions:
 
-### FLAT GS10 structure
+- `FLAT -> INVERTED = -0.10`
+- `INVERTED -> FLAT = 0.10`
+- `FLAT -> STEEP = 1.20`
+- `STEEP -> FLAT = 1.00`
+- outer regime transitions use `2-day confirm`
+
+We also re-ran single-variable HMM + KDE diagnostics directly on term spread.
+
+#### Full-sample 3-state term spread HMM
+
+![Full-sample term spread HMM](results/main_pipeline_final/figures/term_spread_full_sample_kde_hmm.png)
+
+#### Non-inverted 2-state term spread HMM
+
+![Non-inverted term spread HMM](results/main_pipeline_final/figures/term_spread_non_inverted_kde_hmm.png)
+
+Interpretation:
+
+1. Negative term spread is structurally distinct from positive-rate states.
+2. Inside the non-inverted sample, the positive term-spread region still splits into a low-positive zone and a high-positive zone.
+3. That is why the final outer rule uses hysteresis instead of a single `0 / 1` cutoff.
+
+### Inner GS10 Structure
+
+Inside `FLAT` and `STEEP`, the mainline uses separate `GS10` low/mid/high state structure, also with hysteresis and `2-day confirm`.
+
+#### FLAT GS10 structure
 
 ![FLAT GS10 KDE and HMM](results/main_pipeline_final/figures/flat_gs10_kde_hmm.png)
 
-HMM mean GS10 levels:
-- `LOW`: `1.02`
-- `MID`: `2.59`
-- `HIGH`: `4.40`
+Bands:
 
-Final bands:
 - `MID -> LOW = 1.1`
 - `LOW -> MID = 1.3`
 - `HIGH -> MID = 3.4`
 - `MID -> HIGH = 3.6`
 
-### STEEP GS10 structure
+#### STEEP GS10 structure
 
 ![STEEP GS10 KDE and HMM](results/main_pipeline_final/figures/steep_gs10_kde_hmm.png)
 
-HMM mean GS10 levels:
-- `LOW`: `1.79`
-- `MID`: `2.51`
-- `HIGH`: `3.59`
+Bands:
 
-Final bands:
 - `MID -> LOW = 2.0`
 - `LOW -> MID = 2.3`
 - `HIGH -> MID = 3.0`
 - `MID -> HIGH = 3.2`
 
-This gives the final regime universe:
+The final regime universe is:
 
 - `FLAT_LOW_RATE`
 - `FLAT_MID_RATE`
@@ -80,148 +117,140 @@ This gives the final regime universe:
 - `STEEP_HIGH_RATE`
 - `INVERTED`
 
-The hysteresis bands reduce internal churn. They are not cosmetic. They are there to suppress repeated high/low switching around the boundary.
+## Oil Level Layer
+
+Oil level is now part of the mainline, not a side exploration.
+
+Definition:
+
+- 252-day oil moving average
+- `HIGH`: entry at `+20%`, exit at `+5%`
+- `LOW`: entry at `-20%`, exit at `-10%`
+- state confirmation: `10 trading days`
+
+This creates persistent `OIL_LEVEL_HIGH / MID / LOW` states.
+
+The mainline outputs both:
+
+- `oil level x stress`
+- `oil level x non-stress rate regime`
+
+### Oil x Stress
+
+![Oil x stress return heatmap](results/main_pipeline_final/figures/oil_stress_asset_behavior_heatmap.png)
+
+![Oil x stress coverage heatmap](results/main_pipeline_final/figures/oil_stress_coverage_heatmap.png)
+
+### Oil x Non-Stress Rate Regime
+
+![Oil x non-stress rate return heatmap](results/main_pipeline_final/figures/oil_nonrisk_rate_asset_behavior_heatmap.png)
+
+![Oil x non-stress rate coverage heatmap](results/main_pipeline_final/figures/oil_nonrisk_rate_coverage_heatmap.png)
+
+Operationally, when oil is `HIGH`, the flat sleeves remove `GOLD` and `DBB` where applicable.
 
 ## Stress Timing
 
-The final timing module is a **VIX/CREDIT anchor state machine**:
+The timing engine remains the original mainline `VIX / CREDIT` trigger-lock framework.
 
-- `VIX` is enabled in:
-  - `FLAT_LOW_RATE`
-  - `FLAT_MID_RATE`
-  - `FLAT_HIGH_RATE`
-  - `INVERTED`
-- `CREDIT` is enabled in:
-  - `FLAT_LOW_RATE`
-  - `FLAT_MID_RATE`
-  - `FLAT_HIGH_RATE`
-  - `STEEP_MID_RATE`
-  - `STEEP_HIGH_RATE`
-  - `INVERTED`
-- `STEEP_LOW_RATE` has **no native trigger**. If stress appears there, it is carry-over from another regime and is not treated as a standalone trigger-enabled stress block.
-- If a stress period carries into a new regime, the strategy stays on a **stress sleeve** until the locks truly unlock. Regime shift may remap stress to a new regime's stress sleeve, but it never falls back to a normal sleeve while `FULL_RISK` is still active.
+VIX is enabled in:
 
-### Trigger rules
+- `FLAT_LOW_RATE`
+- `FLAT_MID_RATE`
+- `FLAT_HIGH_RATE`
+- `INVERTED`
 
-VIX entry:
-- `VIX_ZSCORE_120D >= 3.0`
+Credit is enabled in:
 
-VIX unlock:
-- `VIX_ZSCORE_120D < 1.5`
-- `SPY > MA20`
+- `FLAT_LOW_RATE`
+- `FLAT_MID_RATE`
+- `FLAT_HIGH_RATE`
+- `STEEP_MID_RATE`
+- `STEEP_HIGH_RATE`
+- `INVERTED`
 
-Credit entry:
-- `D_CREDIT_SPREAD_15D > 0.10`
-- `SPY <= MA20`
+`STEEP_LOW_RATE` has no native trigger. Any stress there is carry-over from a previous trigger-enabled regime.
 
-Credit unlock:
-- `SPY > MA50`
-- `CREDIT_LEVEL_Z_252D < 0.9`
+Trigger rules:
 
-The state machine uses anchor exits:
-- if stress started from VIX, VIX unlock is sufficient;
-- if stress started from credit, credit unlock is sufficient.
+- VIX entry: `VIX_ZSCORE_120D >= 3.0`
+- VIX unlock: `VIX_ZSCORE_120D < 1.5` and `SPY > MA20`
+- Credit entry: `D_CREDIT_SPREAD_15D > 0.10` and `SPY <= MA20`
+- Credit unlock: `SPY > MA50` and `CREDIT_LEVEL_Z_252D < 0.9`
 
-This same state machine drives both:
+Anchor behavior:
+
+- if stress started from VIX, VIX unlock is sufficient
+- if stress started from credit, credit unlock is sufficient
+
+This same timing engine drives both:
+
 - `SPY_CASH_TIMING`
-- the final hedge strategy
+- `FINAL_REGIME_HEDGE_TRIGGER_LOCK`
 
-So the timing benchmark and the final strategy are aligned.
+## Final Allocation Logic
 
-## Allocation Logic
-
-Final sleeves:
-
-| Regime / state | Allocation |
+| Regime / State | Allocation |
 |---|---|
-| `FLAT_LOW_RATE_NORMAL` | `SPY + CMDTY_FUT` inverse-vol |
-| `FLAT_MID_RATE_NORMAL` | `SPY + GOLD` inverse-vol |
-| `FLAT_LOW/MID_RATE_STRESS` | `100% CASH` |
-| `FLAT_HIGH_RATE_NORMAL` | `GOLD + CMDTY_FUT` inverse-vol |
-| `FLAT_HIGH_RATE_STRESS` | `70% IEF + 30% (GOLD + CMDTY_FUT inverse-vol)` |
-| `STEEP_LOW_RATE_NORMAL` | `SPY + CMDTY_FUT` inverse-vol |
+| `FLAT_LOW_RATE_NORMAL` | `SPY + DBC + DBB` inverse-vol, but oil `HIGH` removes `DBB` |
+| `FLAT_MID_RATE_NORMAL` | `SPY + GOLD` inverse-vol, but oil `HIGH` collapses to `SPY` |
+| `FLAT_LOWMID_RATE_STRESS` | `100% CASH` |
+| `FLAT_HIGH_RATE_NORMAL` | `40% IEF + 60% (GOLD + DBC inverse-vol)`, but oil `HIGH` removes `GOLD` |
+| `FLAT_HIGH_RATE_STRESS` | `10% DBA + 90% GOLD`, but oil `HIGH` collapses to `100% DBA` |
+| `STEEP_LOW_RATE_NORMAL` | `100% SPY` |
 | `STEEP_LOW_RATE_STRESS` | `100% SPY` |
 | `STEEP_MID_RATE_NORMAL` | `100% SPY` |
 | `STEEP_MID_RATE_STRESS` | `100% IEF` |
-| `STEEP_HIGH_RATE_NORMAL` | `70% GOLD + 30% (SPY + CMDTY_FUT inverse-vol)` |
+| `STEEP_HIGH_RATE_NORMAL` | `SPY + GOLD` inverse-vol |
 | `STEEP_HIGH_RATE_STRESS` | `100% IEF` |
 | `INVERTED_NORMAL` | `SPY + GOLD` inverse-vol |
-| `INVERTED_STRESS` | `10% CASH + 90% (SPY + GOLD inverse-vol)` |
-
-Notes:
-- `FLAT_LOW_RATE_STRESS` and `FLAT_MID_RATE_STRESS` are merged into `FLAT_LOWMID_RATE_STRESS` in the mainline heatmap because the low block was too small by itself.
-- `STEEP_LOW_RATE_STRESS` is carry-over only. It has no native trigger, but once a stress period enters `STEEP_LOW_RATE`, it remains on a stress sleeve rather than reverting to normal before unlock.
+| `INVERTED_STRESS` | `90% CASH + 10% SPY` |
 
 ## Heatmap Evidence
+
+The heatmap layer is part of the mainline evidence set.
 
 ![Cross-state return heatmap](results/main_pipeline_final/figures/cross_state_asset_behavior_heatmap.png)
 
 ![Cross-state Sharpe heatmap](results/main_pipeline_final/figures/cross_state_asset_sharpe_heatmap.png)
 
-![Pure regime-stress Sharpe heatmap](results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png)
+![Pure regime x stress Sharpe heatmap](results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png)
 
-These heatmaps are part of the main thesis:
-1. macro data itself has internal structure, so `FLAT` and `STEEP` should not be forced into one coarse low/high split;
-2. asset behavior also changes across those refined states, so the extra classification has allocation value.
-3. the pure `regime x stress` Sharpe view is now part of the mainline outputs, so carry-over stress blocks can be analyzed directly.
+These outputs support the final design:
 
-Current heatmap buckets and sample sizes:
-- `FLAT_LOW_RATE_NORMAL`: `193`
-- `FLAT_MID_RATE_NORMAL`: `361`
-- `FLAT_LOWMID_RATE_STRESS`: `398`
-- `FLAT_HIGH_RATE_NORMAL`: `443`
-- `FLAT_HIGH_RATE_STRESS`: `121`
-- `STEEP_LOW_RATE_NORMAL`: `985`
-- `STEEP_LOW_RATE_STRESS`: `188`
-- `STEEP_MID_RATE_NORMAL`: `678`
-- `STEEP_MID_RATE_STRESS`: `339`
-- `STEEP_HIGH_RATE_NORMAL`: `385`
-- `STEEP_HIGH_RATE_STRESS`: `248`
-- `INVERTED_NORMAL`: `751`
-- `INVERTED_STRESS`: `172`
+1. macro variables have internal structure, so buffered regime transitions are justified
+2. asset behavior changes materially across refined regimes
+3. oil level changes cross-section behavior further inside stress and non-stress buckets
 
 ## Crisis Windows
 
-| Window | SPY_CASH_TIMING | FINAL_REGIME_HEDGE_TRIGGER_LOCK |
-|---|---:|---:|
-| 2008_GFC | `+7.40%`, MaxDD `-8.17%` | `+42.56%`, MaxDD `-6.18%` |
-| 2011_EURO_DEBT | `-3.74%`, MaxDD `-4.55%` | `+20.05%`, MaxDD `-9.54%` |
-| 2015_2016 | `+3.24%`, MaxDD `-3.32%` | `+17.18%`, MaxDD `-5.70%` |
-| COVID_2020 | `+17.01%`, MaxDD `-6.99%` | `+20.59%`, MaxDD `-10.41%` |
-| 2022_RATE_WAR | `+3.79%`, MaxDD `-9.73%` | `+14.80%`, MaxDD `-10.29%` |
-| 2025_PULLBACK | `+11.58%`, MaxDD `-14.60%` | `+21.18%`, MaxDD `-6.18%` |
+Representative case-study figures are included in the mainline output set:
 
-The final strategy improves compounding on top of the new timing logic without giving up stress control.
+- ![2008 GFC](results/main_pipeline_final/figures/case_2008_GFC_final.png)
+- ![2011 Euro Debt](results/main_pipeline_final/figures/case_2011_euro_debt_final.png)
+- ![COVID 2020](results/main_pipeline_final/figures/case_2020_covid_final.png)
+- ![2022 Rate War](results/main_pipeline_final/figures/case_2022_rate_war_final.png)
 
-Representative crisis-window figures from the mainline outputs:
-
-![2008 GFC](results/main_pipeline_final/figures/case_2008_GFC_final.png)
-
-![2011 Euro Debt](results/main_pipeline_final/figures/case_2011_euro_debt_final.png)
-
-![COVID 2020](results/main_pipeline_final/figures/case_2020_covid_final.png)
-
-![2022 Rate War](results/main_pipeline_final/figures/case_2022_rate_war_final.png)
-
-## Source-Only Mainline
-
-Main run order:
+## Canonical Run Order
 
 ```bash
 python scripts/run_final_strategy_source_only.py
 python scripts/08_stress_trigger_diagnostics.py
 python scripts/10_final_report_outputs.py
+python scripts/30_generate_live_regime_dashboard.py
 python scripts/hard_validate_main_pipeline_source_only.py
 ```
 
-Mainline outputs:
-- [results/main_pipeline_final/README_final_strategy.md](results/main_pipeline_final/README_final_strategy.md)
-- [strategy table](results/main_pipeline_final/tables/strategy_performance_comparison.csv)
-- [final report](reports/FINAL_REPORT.md)
+## Main Output Entry Points
+
+- [Mainline strategy README](results/main_pipeline_final/README_final_strategy.md)
+- [Mainline performance table](results/main_pipeline_final/tables/strategy_performance_comparison.csv)
+- [Live dashboard HTML](results/live_regime_dashboard/live_regime_dashboard.html)
+- [Project report](reports/FINAL_REPORT.md)
 
 ## Limitations
 
-- This remains in-sample research.
-- `FLAT_HIGH_RATE_STRESS` and `INVERTED_STRESS` are still moderate-sample blocks.
-- The HMM/KDE diagnostics support the internal structure, but allocation still needs OOS validation.
-- Daily credit data needs consistent filling and calendar alignment.
+- This is still research, not out-of-sample proof.
+- Some refined cross states remain moderate-sample.
+- The HMM/KDE diagnostics justify the regime structure, but they do not by themselves prove allocation optimality.
+- Live dashboard freshness depends on external data availability and local cache fallback.
