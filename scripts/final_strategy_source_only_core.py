@@ -19,9 +19,11 @@ SOURCE_INPUTS = {
     "vix": ROOT / "data" / "raw" / "macro" / "volatility" / "VIXCLS.csv",
     "daaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DAAA.csv",
     "dbaa": ROOT / "data" / "raw" / "macro" / "Credit" / "DBAA.csv",
+    "oil_prices": ROOT / "data" / "raw" / "market" / "oil_level_raw_prices.csv",
 }
+LEGACY_OIL_INPUT = ROOT / "results" / "oil_level_change_explanatory_power_v1" / "data" / "oil_level_change_raw_prices.csv"
 
-ASSETS = ["SPY", "GOLD", "CMDTY_FUT", "IEF", "CASH"]
+ASSETS = ["SPY", "GOLD", "IEF", "DBC", "DBB", "DBA", "CASH"]
 SPY_BUY_HOLD = "SPY_BUY_HOLD"
 SPY_CASH_TIMING = "SPY_CASH_TIMING"
 FINAL_STRATEGY = "FINAL_REGIME_HEDGE_TRIGGER_LOCK"
@@ -29,16 +31,23 @@ REFINED_BASELINE = "REGIME_ONLY_REFERENCE"
 ASSET_RETURN_MAP = {
     "SPY_return": "SPY",
     "GOLD_return": "GLD",
-    "CMDTY_FUT_return": "GD=F",
     "IEF_return": "IEF",
+    "DBC_return": "DBC",
+    "DBB_return": "DBB",
+    "DBA_return": "DBA",
 }
 
-CONFIRMATION_DAYS = 3
+RATE_CONFIRMATION_DAYS = 2
 INV_VOL_WINDOW = 90
 ONE_WAY_COST_BPS = 10.0
 TRIGGER_LOCK_CREDIT_WINDOW = 15
 TRIGGER_LOCK_CREDIT_ENTRY_THRESHOLD = 0.10
 TRIGGER_LOCK_CREDIT_LEVEL_Z_EXIT_THRESHOLD = 0.9
+
+OUTER_INV_TO_FLAT = 0.10
+OUTER_FLAT_TO_INV = -0.10
+OUTER_FLAT_TO_STEEP = 1.20
+OUTER_STEEP_TO_FLAT = 1.00
 
 FLAT_MID_TO_LOW = 1.1
 FLAT_LOW_TO_MID = 1.3
@@ -49,6 +58,18 @@ STEEP_MID_TO_LOW = 2.0
 STEEP_LOW_TO_MID = 2.3
 STEEP_HIGH_TO_MID = 3.0
 STEEP_MID_TO_HIGH = 3.2
+
+OIL_SIGNAL_FALLBACK = "CL=F"
+OIL_SIGNAL_INTENDED = "MCL=F"
+OIL_LEVEL_HIGH = "OIL_LEVEL_HIGH"
+OIL_LEVEL_MID = "OIL_LEVEL_MID"
+OIL_LEVEL_LOW = "OIL_LEVEL_LOW"
+OIL_MA_WINDOW = 252
+OIL_CONFIRM_DAYS = 10
+OIL_HIGH_ENTRY = 0.20
+OIL_HIGH_EXIT = 0.05
+OIL_LOW_ENTRY = -0.20
+OIL_LOW_EXIT = -0.10
 
 
 def rel(path: Path) -> str:
@@ -73,7 +94,7 @@ def read_fred_series(path: Path, value_name: str) -> pd.DataFrame:
     return out.sort_values("date").drop_duplicates("date")
 
 
-def confirm_state(raw: Iterable[str], confirmation_days: int = CONFIRMATION_DAYS, initial: str | None = None) -> list[str]:
+def confirm_state(raw: Iterable[str], confirmation_days: int, initial: str | None = None) -> list[str]:
     values = [str(v) for v in raw]
     if not values:
         return []
@@ -98,6 +119,90 @@ def confirm_state(raw: Iterable[str], confirmation_days: int = CONFIRMATION_DAYS
     return confirmed
 
 
+def consecutive_true(mask: pd.Series, n: int) -> pd.Series:
+    mask = mask.fillna(False).astype(bool)
+    if n <= 1:
+        return mask
+    return mask.rolling(n, min_periods=n).sum().eq(n)
+
+
+def load_oil_price_series() -> pd.Series:
+    path = SOURCE_INPUTS["oil_prices"] if SOURCE_INPUTS["oil_prices"].exists() else LEGACY_OIL_INPUT
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Missing oil raw price input: expected {rel(SOURCE_INPUTS['oil_prices'])} "
+            f"or legacy fallback {rel(LEGACY_OIL_INPUT)}"
+        )
+    prices = pd.read_csv(path, parse_dates=["date"]).set_index("date").sort_index()
+    signal = OIL_SIGNAL_FALLBACK if OIL_SIGNAL_FALLBACK in prices.columns and prices[OIL_SIGNAL_FALLBACK].notna().sum() >= OIL_MA_WINDOW else OIL_SIGNAL_INTENDED
+    if signal not in prices.columns:
+        raise ValueError(f"{rel(path)} missing both {OIL_SIGNAL_FALLBACK} and {OIL_SIGNAL_INTENDED}")
+    oil = pd.to_numeric(prices[signal], errors="coerce").dropna()
+    if oil.empty:
+        raise ValueError(f"{rel(path)} has no usable oil prices")
+    return oil.rename("oil_price")
+
+
+def build_oil_level_state() -> pd.DataFrame:
+    oil = load_oil_price_series()
+    ma = oil.rolling(OIL_MA_WINDOW, min_periods=OIL_MA_WINDOW).mean()
+    dev = oil / ma - 1.0
+
+    enter_high = consecutive_true(dev >= OIL_HIGH_ENTRY, OIL_CONFIRM_DAYS)
+    exit_high = consecutive_true(dev <= OIL_HIGH_EXIT, OIL_CONFIRM_DAYS)
+    enter_low = consecutive_true(dev <= OIL_LOW_ENTRY, OIL_CONFIRM_DAYS)
+    exit_low = consecutive_true(dev >= OIL_LOW_EXIT, OIL_CONFIRM_DAYS)
+
+    state: str | float = np.nan
+    states: list[str | float] = []
+    reasons: list[str] = []
+    for dt in oil.index:
+        if pd.isna(dev.loc[dt]):
+            states.append(np.nan)
+            reasons.append("WARMUP")
+            continue
+        if pd.isna(state):
+            state = OIL_LEVEL_MID
+            reasons.append("INITIAL_MID")
+        elif state == OIL_LEVEL_MID:
+            if bool(enter_high.loc[dt]):
+                state = OIL_LEVEL_HIGH
+                reasons.append("ENTER_HIGH")
+            elif bool(enter_low.loc[dt]):
+                state = OIL_LEVEL_LOW
+                reasons.append("ENTER_LOW")
+            else:
+                reasons.append("STAY_MID")
+        elif state == OIL_LEVEL_HIGH:
+            if bool(exit_high.loc[dt]):
+                state = OIL_LEVEL_MID
+                reasons.append("EXIT_HIGH_TO_MID")
+            else:
+                reasons.append("STAY_HIGH")
+        else:
+            if bool(exit_low.loc[dt]):
+                state = OIL_LEVEL_MID
+                reasons.append("EXIT_LOW_TO_MID")
+            else:
+                reasons.append("STAY_LOW")
+        states.append(state)
+
+    return (
+        pd.DataFrame(
+            {
+                "date": oil.index,
+                "oil_price": oil.values,
+                "oil_ma_252d": ma.values,
+                "oil_price_to_ma": dev.values,
+                "oil_level_regime": states,
+                "oil_level_reason": reasons,
+            }
+        )
+        .sort_values("date")
+        .reset_index(drop=True)
+    )
+
+
 def build_monthly_either_state(df: pd.DataFrame) -> pd.Series:
     monthly = df[["date", "spy_price"]].dropna().copy()
     monthly = monthly.set_index("date").resample("ME").last().dropna().reset_index()
@@ -119,6 +224,37 @@ def build_monthly_either_state(df: pd.DataFrame) -> pd.Series:
         direction="backward",
     )
     return merged["monthly_either_state"].fillna("HOLD")
+
+
+def classify_macro_hysteresis(spread: pd.Series) -> pd.Series:
+    values = pd.to_numeric(spread, errors="coerce")
+    first = float(values.dropna().iloc[0])
+    if first < OUTER_FLAT_TO_INV:
+        current = "INVERTED"
+    elif first > OUTER_FLAT_TO_STEEP:
+        current = "STEEP"
+    else:
+        current = "FLAT"
+
+    states: list[str] = []
+    for value in values:
+        if pd.isna(value):
+            states.append(current)
+            continue
+        value = float(value)
+        if current == "INVERTED":
+            if value >= OUTER_INV_TO_FLAT:
+                current = "FLAT"
+        elif current == "FLAT":
+            if value <= OUTER_FLAT_TO_INV:
+                current = "INVERTED"
+            elif value >= OUTER_FLAT_TO_STEEP:
+                current = "STEEP"
+        else:
+            if value <= OUTER_STEEP_TO_FLAT:
+                current = "FLAT"
+        states.append(current)
+    return pd.Series(states, index=spread.index, name="macro_regime_raw")
 
 
 def classify_flat_three_state(panel: pd.DataFrame) -> pd.Series:
@@ -147,7 +283,7 @@ def classify_flat_three_state(panel: pd.DataFrame) -> pd.Series:
             elif current == "FLAT_HIGH_RATE" and value <= FLAT_HIGH_TO_MID:
                 current = "FLAT_MID_RATE"
             raw_labels.append(current)
-        confirmed.loc[idx] = confirm_state(raw_labels, confirmation_days=CONFIRMATION_DAYS, initial=raw_labels[0])
+        confirmed.loc[idx] = confirm_state(raw_labels, confirmation_days=RATE_CONFIRMATION_DAYS, initial=raw_labels[0])
     out.loc[flat] = confirmed.loc[flat]
     return out.astype(str)
 
@@ -178,7 +314,7 @@ def classify_steep_three_state(panel: pd.DataFrame, base_regime: pd.Series) -> p
             elif current == "STEEP_HIGH_RATE" and value <= STEEP_HIGH_TO_MID:
                 current = "STEEP_MID_RATE"
             raw_labels.append(current)
-        confirmed.loc[idx] = confirm_state(raw_labels, confirmation_days=CONFIRMATION_DAYS, initial=raw_labels[0])
+        confirmed.loc[idx] = confirm_state(raw_labels, confirmation_days=RATE_CONFIRMATION_DAYS, initial=raw_labels[0])
     out.loc[steep] = confirmed.loc[steep]
     out.loc[panel["macro_regime_confirmed"].eq("INVERTED")] = "INVERTED"
     return out.astype(str)
@@ -193,6 +329,7 @@ def build_source_panel() -> pd.DataFrame:
     vix = read_fred_series(SOURCE_INPUTS["vix"], "VIXCLS").rename(columns={"VIXCLS": "VIX_LEVEL"})
     daaa = read_fred_series(SOURCE_INPUTS["daaa"], "DAAA").rename(columns={"DAAA": "WAAA"})
     dbaa = read_fred_series(SOURCE_INPUTS["dbaa"], "DBAA").rename(columns={"DBAA": "WBAA"})
+    oil_state = build_oil_level_state()
 
     panel = prices[["date", "SPY"]].rename(columns={"SPY": "spy_price"}).copy()
     for out_col, src_col in ASSET_RETURN_MAP.items():
@@ -201,10 +338,15 @@ def build_source_panel() -> pd.DataFrame:
         panel = panel.merge(returns[["date", src_col]].rename(columns={src_col: out_col}), on="date", how="left")
     for frame in [dgs10, dgs1, dtb3, vix, daaa, dbaa]:
         panel = panel.merge(frame, on="date", how="left")
+    panel = pd.merge_asof(panel.sort_values("date"), oil_state.sort_values("date"), on="date", direction="backward")
     panel = panel.sort_values("date").drop_duplicates("date").reset_index(drop=True)
 
     for col in ["DGS10", "DGS1", "DTB3", "VIX_LEVEL", "WAAA", "WBAA"]:
         panel[col] = pd.to_numeric(panel[col], errors="coerce").ffill().bfill()
+
+    return_cols = list(ASSET_RETURN_MAP.keys())
+    for col in return_cols + ["oil_price", "oil_ma_252d", "oil_price_to_ma"]:
+        panel[col] = pd.to_numeric(panel[col], errors="coerce")
 
     panel["GS10"] = panel["DGS10"]
     panel["GS1"] = panel["DGS1"]
@@ -231,27 +373,19 @@ def build_source_panel() -> pd.DataFrame:
         (panel["CREDIT_SPREAD_BAA_AAA"] - credit_roll.mean()) / credit_roll.std(ddof=1).replace(0, np.nan)
     )
 
-    cmdty_price = (1.0 + panel["CMDTY_FUT_return"].fillna(0.0)).cumprod()
-    panel["CMDTY_FUT_price"] = cmdty_price
-    panel["CMDTY_RET60"] = cmdty_price / cmdty_price.shift(60) - 1.0
-    panel["CMDTY_RET20"] = cmdty_price / cmdty_price.shift(20) - 1.0
+    dbc_price = (1.0 + panel["DBC_return"].fillna(0.0)).cumprod()
+    panel["DBC_price"] = dbc_price
+    panel["DBC_RET60"] = dbc_price / dbc_price.shift(60) - 1.0
+    panel["DBC_RET20"] = dbc_price / dbc_price.shift(20) - 1.0
 
-    raw_regime = np.select(
-        [
-            panel["TERM_SPREAD_10Y_1Y"] < 0,
-            panel["TERM_SPREAD_10Y_1Y"] <= 1,
-            panel["TERM_SPREAD_10Y_1Y"] > 1,
-        ],
-        ["INVERTED", "FLAT", "STEEP"],
-        default="FLAT",
-    )
+    raw_regime = classify_macro_hysteresis(panel["TERM_SPREAD_10Y_1Y"])
     panel["macro_regime_raw"] = raw_regime
-    panel["macro_regime_confirmed"] = confirm_state(raw_regime, confirmation_days=CONFIRMATION_DAYS, initial=str(raw_regime[0]))
+    panel["macro_regime_confirmed"] = confirm_state(raw_regime, confirmation_days=RATE_CONFIRMATION_DAYS, initial=str(raw_regime.iloc[0]))
     panel["monthly_either_state"] = build_monthly_either_state(panel)
 
     panel = panel.loc[panel["date"] >= pd.Timestamp("2006-03-16")].reset_index(drop=True)
-    for col in ["SPY_return", "GOLD_return", "CMDTY_FUT_return", "IEF_return", "CASH_return", "daily_rf"]:
-        panel[col] = pd.to_numeric(panel[col], errors="coerce").fillna(0.0)
+    required = return_cols + ["CASH_return", "daily_rf", "oil_level_regime"]
+    panel = panel.dropna(subset=required).reset_index(drop=True)
 
     flat_regime = classify_flat_three_state(panel)
     final_regime = classify_steep_three_state(panel, flat_regime)
@@ -314,24 +448,35 @@ def mixed_inv_vol_row(row_weights: dict[str, float], fixed: dict[str, float] | N
     return normalize_weight_dict(weights)
 
 
+def oil_high(row: pd.Series) -> bool:
+    return str(row["oil_level_regime"]) == OIL_LEVEL_HIGH
+
+
 def normal_allocation_by_regime(
     i: int,
+    row: pd.Series,
     final_regime: str,
     flat_low_normal: pd.DataFrame,
+    flat_low_oil_high: pd.DataFrame,
     flat_mid_normal: pd.DataFrame,
-    flat_high_normal: pd.DataFrame,
-    steep_low_normal: pd.DataFrame,
+    flat_high_gold_dbc: pd.DataFrame,
+    flat_high_dbc_only: pd.DataFrame,
     steep_high_normal: pd.DataFrame,
     inverted_normal: pd.DataFrame,
 ) -> tuple[dict[str, float], str]:
+    flat_oil_high = oil_high(row)
     if final_regime == "FLAT_LOW_RATE":
-        return flat_low_normal.loc[i].to_dict(), "FLAT_LOW_RATE_NORMAL"
+        base = flat_low_oil_high if flat_oil_high else flat_low_normal
+        return base.loc[i].to_dict(), "FLAT_LOW_RATE_NORMAL"
     if final_regime == "FLAT_MID_RATE":
+        if flat_oil_high:
+            return {"SPY": 1.0}, "FLAT_MID_RATE_NORMAL"
         return flat_mid_normal.loc[i].to_dict(), "FLAT_MID_RATE_NORMAL"
     if final_regime == "FLAT_HIGH_RATE":
-        return flat_high_normal.loc[i].to_dict(), "FLAT_HIGH_RATE_NORMAL"
+        base = flat_high_dbc_only if flat_oil_high else flat_high_gold_dbc
+        return mixed_inv_vol_row(base.loc[i].to_dict(), {"IEF": 0.40}), "FLAT_HIGH_RATE_NORMAL"
     if final_regime == "STEEP_LOW_RATE":
-        return steep_low_normal.loc[i].to_dict(), "STEEP_LOW_RATE_NORMAL"
+        return {"SPY": 1.0}, "STEEP_LOW_RATE_NORMAL"
     if final_regime == "STEEP_MID_RATE":
         return {"SPY": 1.0}, "STEEP_MID_RATE_NORMAL"
     if final_regime == "STEEP_HIGH_RATE":
@@ -343,25 +488,22 @@ def normal_allocation_by_regime(
 
 def stress_allocation_by_regime(
     i: int,
+    row: pd.Series,
     final_regime: str,
-    flat_high_stress_gc: pd.DataFrame,
-    steep_low_normal: pd.DataFrame,
-    inverted_normal: pd.DataFrame,
 ) -> tuple[dict[str, float], str]:
+    flat_oil_high = oil_high(row)
     if final_regime in {"FLAT_LOW_RATE", "FLAT_MID_RATE"}:
         return {"CASH": 1.0}, "FLAT_LOWMID_RATE_STRESS"
     if final_regime == "FLAT_HIGH_RATE":
-        base = flat_high_stress_gc.loc[i].to_dict()
-        return mixed_inv_vol_row(base, {"IEF": 0.70}), "FLAT_HIGH_RATE_STRESS"
+        if flat_oil_high:
+            return {"DBA": 1.0}, "FLAT_HIGH_RATE_STRESS"
+        return {"DBA": 0.10, "GOLD": 0.90}, "FLAT_HIGH_RATE_STRESS"
     if final_regime == "STEEP_LOW_RATE":
-        # No native trigger is allowed in steep-low, but an existing FULL_RISK episode
-        # must remain on a stress sleeve until the locks actually unlock.
         return {"SPY": 1.0}, "STEEP_LOW_RATE_STRESS"
     if final_regime in {"STEEP_MID_RATE", "STEEP_HIGH_RATE"}:
         return {"IEF": 1.0}, f"{final_regime}_STRESS"
     if final_regime == "INVERTED":
-        base = inverted_normal.loc[i].to_dict()
-        return mixed_inv_vol_row(base, {"CASH": 0.10}), "INVERTED_STRESS"
+        return {"CASH": 0.90, "SPY": 0.10}, "INVERTED_STRESS"
     raise ValueError(f"Unexpected final regime: {final_regime}")
 
 
@@ -399,12 +541,12 @@ def unlock_trigger_locks(row: pd.Series, active_locks: set[str]) -> set[str]:
 
 
 def build_trigger_lock_final_weights(df: pd.DataFrame, inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.DataFrame]:
-    flat_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    flat_low_normal = monthly_hold_weights(df, ["SPY", "DBC", "DBB"], window=inv_vol_window)
+    flat_low_oil_high = monthly_hold_weights(df, ["SPY", "DBC"], window=inv_vol_window)
     flat_mid_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
-    flat_high_normal = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
-    flat_high_stress_gc = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
-    steep_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
-    steep_high_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    flat_high_gold_dbc = monthly_hold_weights(df, ["GOLD", "DBC"], window=inv_vol_window)
+    flat_high_dbc_only = monthly_hold_weights(df, ["DBC"], window=inv_vol_window)
+    steep_high_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
     inverted_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
 
     weights = pd.DataFrame(0.0, index=df.index, columns=ASSETS)
@@ -439,7 +581,7 @@ def build_trigger_lock_final_weights(df: pd.DataFrame, inv_vol_window: int = INV
         next_anchor = current_anchor
 
         if current_full_risk:
-            w, allocation_state = stress_allocation_by_regime(i, final_regime, flat_high_stress_gc, steep_low_normal, inverted_normal)
+            w, allocation_state = stress_allocation_by_regime(i, row, final_regime)
 
             if not current_anchor:
                 current_anchor = "BOTH" if current_vix and current_credit else "VIX" if current_vix else "CREDIT" if current_credit else ""
@@ -481,16 +623,16 @@ def build_trigger_lock_final_weights(df: pd.DataFrame, inv_vol_window: int = INV
         else:
             w, allocation_state = normal_allocation_by_regime(
                 i,
+                row,
                 final_regime,
                 flat_low_normal,
+                flat_low_oil_high,
                 flat_mid_normal,
-                flat_high_normal,
-                steep_low_normal,
+                flat_high_gold_dbc,
+                flat_high_dbc_only,
                 steep_high_normal,
                 inverted_normal,
             )
-            if final_regime == "STEEP_HIGH_RATE":
-                w = mixed_inv_vol_row(w, {"GOLD": 0.70})
             if vix_ent and credit_ent:
                 entry_signal = True
                 lock_added_today.update({"VIX", "CREDIT"})
@@ -535,23 +677,27 @@ def build_trigger_lock_final_weights(df: pd.DataFrame, inv_vol_window: int = INV
 
 
 def base_reference_weights(df: pd.DataFrame, inv_vol_window: int = INV_VOL_WINDOW) -> tuple[pd.DataFrame, pd.Series]:
-    flat_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
+    flat_low_normal = monthly_hold_weights(df, ["SPY", "DBC", "DBB"], window=inv_vol_window)
+    flat_low_oil_high = monthly_hold_weights(df, ["SPY", "DBC"], window=inv_vol_window)
     flat_mid_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
-    flat_high_normal = monthly_hold_weights(df, ["GOLD", "CMDTY_FUT"], window=inv_vol_window)
-    steep_low_normal = monthly_hold_weights(df, ["SPY", "CMDTY_FUT"], window=inv_vol_window)
-    steep_high_normal = monthly_hold_weights(df, ["SPY", "GOLD", "CMDTY_FUT"], window=inv_vol_window)
+    flat_high_gold_dbc = monthly_hold_weights(df, ["GOLD", "DBC"], window=inv_vol_window)
+    flat_high_dbc_only = monthly_hold_weights(df, ["DBC"], window=inv_vol_window)
+    steep_high_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
     inverted_normal = monthly_hold_weights(df, ["SPY", "GOLD"], window=inv_vol_window)
+
     weights = pd.DataFrame(0.0, index=df.index, columns=ASSETS)
     states = []
     for i, row in df.iterrows():
         regime = str(row["final_regime_confirmed"])
         w, state = normal_allocation_by_regime(
             i,
+            row,
             regime,
             flat_low_normal,
+            flat_low_oil_high,
             flat_mid_normal,
-            flat_high_normal,
-            steep_low_normal,
+            flat_high_gold_dbc,
+            flat_high_dbc_only,
             steep_high_normal,
             inverted_normal,
         )
@@ -653,6 +799,7 @@ def write_source_only_outputs(output_dir: Path | None = None, inv_vol_window: in
     panel[
         [
             "date",
+            "oil_level_regime",
             "macro_regime_confirmed",
             "refined_regime_confirmed",
             "final_regime_confirmed",
