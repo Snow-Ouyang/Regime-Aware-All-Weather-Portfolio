@@ -42,12 +42,12 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
 <main>
 <section>
 <h2>Current State</h2>
-<div class="cards"><div class='card'><div class='card-label'>Latest data date</div><div class='card-value'>2026-05-26</div></div><div class='card'><div class='card-label'>Macro regime</div><div class='card-value'>FLAT_HIGH_RATE</div></div><div class='card'><div class='card-label'>Stress state</div><div class='card-value'>NON_RISK</div></div><div class='card'><div class='card-label'>Active locks</div><div class='card-value'>None</div></div><div class='card'><div class='card-label'>Regime start</div><div class='card-value'>2024-12-11</div></div><div class='card'><div class='card-label'>Days in regime</div><div class='card-value'>531</div></div><div class='card'><div class='card-label'>Allocation</div><div class='card-value'>GOLD 48.15%, CMDTY_FUT 51.85%</div></div><div class='card'><div class='card-label'>Strategy vs SPY RTD</div><div class='card-value'>43.06% vs 28.71%</div></div><div class='card'><div class='card-label'>Current DD vs SPY</div><div class='card-value'>-5.63% vs 0.00%</div></div></div>
+<div class="cards"><div class='card'><div class='card-label'>Latest data date</div><div class='card-value'>2026-06-12</div></div><div class='card'><div class='card-label'>Macro regime</div><div class='card-value'>FLAT_HIGH_RATE</div></div><div class='card'><div class='card-label'>Stress state</div><div class='card-value'>NON_RISK</div></div><div class='card'><div class='card-label'>Oil level</div><div class='card-value'>OIL_LEVEL_HIGH</div></div><div class='card'><div class='card-label'>Active locks</div><div class='card-value'>None</div></div><div class='card'><div class='card-label'>Regime start</div><div class='card-value'>2024-12-13</div></div><div class='card'><div class='card-label'>Days in regime</div><div class='card-value'>546</div></div><div class='card'><div class='card-label'>Allocation</div><div class='card-value'>IEF 40.00%, DBC 60.00%</div></div><div class='card'><div class='card-label'>Strategy vs SPY RTD</div><div class='card-value'>44.89% vs 27.50%</div></div><div class='card'><div class='card-label'>Current DD vs SPY</div><div class='card-value'>-5.76% vs -2.35%</div></div></div>
 </section>
 <section>
 <h2>Current Regime Interpretation</h2>
-<div class='interpretation-grid'><div class='info-row'><div class='info-label'>Economic Meaning</div><div>A flat curve with high long rates reflects elevated rate pressure while the curve is not steep enough to signal a broad pro-growth steep regime.</div></div><div class='info-row'><div class='info-label'>Typical Risk</div><div>Equity beta can be vulnerable if high rates tighten financial conditions or credit spreads widen.</div></div><div class='info-row'><div class='info-label'>Preferred Assets</div><div>The final strategy emphasizes gold and commodity futures in the normal state.</div></div><div class='info-row'><div class='info-label'>Stress Behavior</div><div>Stress shifts toward a 70% IEF sleeve plus 30% gold/commodity inverse-vol exposure.</div></div><div class='info-row'><div class='info-label'>Monitoring Focus</div><div>Watch the term spread boundary near STEEP, credit spread changes, and VIX shocks.</div></div></div>
-<ul><li>FLAT_HIGH_RATE: A flat curve with high long rates reflects elevated rate pressure while the curve is not steep enough to signal a broad pro-growth steep regime.</li><li>Stress state is NON_RISK; active locks are none.</li><li>The largest sleeve is CMDTY_FUT; the displayed target weights come directly from the final allocation rule.</li><li>The closest monitored signal is SPY drawdown from previous high (drawdown monitor), currently above drawdown monitor.</li><li>Regime-to-date, the strategy has outperformed SPY.</li></ul>
+<div class='interpretation-grid'><div class='info-row'><div class='info-label'>Economic Meaning</div><div>A flat curve with high long rates reflects elevated rate pressure while the curve is not steep enough to signal a broad pro-growth steep regime.</div></div><div class='info-row'><div class='info-label'>Typical Risk</div><div>Equity beta can be vulnerable if high rates tighten financial conditions or credit spreads widen.</div></div><div class='info-row'><div class='info-label'>Preferred Assets</div><div>The final strategy uses 40% IEF plus 60% gold/DBC inverse-vol in the normal state; if oil is HIGH, gold is removed from the floating sleeve.</div></div><div class='info-row'><div class='info-label'>Stress Behavior</div><div>Stress shifts to 10% DBA plus 90% gold; if oil is HIGH, the sleeve collapses to 100% DBA.</div></div><div class='info-row'><div class='info-label'>Monitoring Focus</div><div>Watch the term spread boundary near STEEP, credit spread changes, VIX shocks, and oil level changes.</div></div></div>
+<ul><li>FLAT_HIGH_RATE: A flat curve with high long rates reflects elevated rate pressure while the curve is not steep enough to signal a broad pro-growth steep regime.</li><li>Stress state is NON_RISK; active locks are none.</li><li>Oil state is OIL_LEVEL_HIGH; oil price is +18.4% versus its 252-day average.</li><li>Outer macro regime uses term-spread hysteresis with thresholds flat-&gt;inverted -0.10, inverted-&gt;flat 0.10, flat-&gt;steep 1.20, steep-&gt;flat 1.00.</li><li>The largest sleeve is DBC; the displayed target weights come directly from the final allocation rule.</li><li>The closest monitored signal is Oil price vs 252d MA (HIGH entry), currently below HIGH entry.</li><li>Regime-to-date, the strategy has outperformed SPY.</li></ul>
 </section>
 <section>
 <h2>Current Allocation</h2>
@@ -67,47 +67,67 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
   </thead>
   <tbody>
     <tr>
-      <td>2026-05-26</td>
+      <td>2026-06-12</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>SPY</td>
       <td>0.00%</td>
       <td>inverse_vol_monthly_hold</td>
-      <td>0.14</td>
+      <td>0.15</td>
       <td></td>
       <td>normal allocation for FLAT_HIGH_RATE</td>
     </tr>
     <tr>
-      <td>2026-05-26</td>
+      <td>2026-06-12</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>GOLD</td>
-      <td>48.15%</td>
-      <td>inverse_vol_monthly_hold</td>
-      <td>0.36</td>
-      <td>49.82%</td>
-      <td>normal allocation for FLAT_HIGH_RATE</td>
-    </tr>
-    <tr>
-      <td>2026-05-26</td>
-      <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>CMDTY_FUT</td>
-      <td>51.85%</td>
-      <td>inverse_vol_monthly_hold</td>
-      <td>0.36</td>
-      <td>50.18%</td>
-      <td>normal allocation for FLAT_HIGH_RATE</td>
-    </tr>
-    <tr>
-      <td>2026-05-26</td>
-      <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>IEF</td>
       <td>0.00%</td>
       <td>inverse_vol_monthly_hold</td>
-      <td>0.05</td>
+      <td>0.36</td>
       <td></td>
       <td>normal allocation for FLAT_HIGH_RATE</td>
     </tr>
     <tr>
-      <td>2026-05-26</td>
+      <td>2026-06-12</td>
+      <td>FLAT_HIGH_RATE_NORMAL</td>
+      <td>IEF</td>
+      <td>40.00%</td>
+      <td>inverse_vol_monthly_hold</td>
+      <td>0.05</td>
+      <td>82.86%</td>
+      <td>normal allocation for FLAT_HIGH_RATE</td>
+    </tr>
+    <tr>
+      <td>2026-06-12</td>
+      <td>FLAT_HIGH_RATE_NORMAL</td>
+      <td>DBC</td>
+      <td>60.00%</td>
+      <td>inverse_vol_monthly_hold</td>
+      <td>0.25</td>
+      <td>17.14%</td>
+      <td>DBC is active under FLAT_HIGH_RATE_NORMAL; oil state is OIL_LEVEL_HIGH.</td>
+    </tr>
+    <tr>
+      <td>2026-06-12</td>
+      <td>FLAT_HIGH_RATE_NORMAL</td>
+      <td>DBB</td>
+      <td>0.00%</td>
+      <td>inverse_vol_monthly_hold</td>
+      <td>0.22</td>
+      <td></td>
+      <td>DBB is active under FLAT_HIGH_RATE_NORMAL; oil state is OIL_LEVEL_HIGH.</td>
+    </tr>
+    <tr>
+      <td>2026-06-12</td>
+      <td>FLAT_HIGH_RATE_NORMAL</td>
+      <td>DBA</td>
+      <td>0.00%</td>
+      <td>inverse_vol_monthly_hold</td>
+      <td>0.09</td>
+      <td></td>
+      <td>DBA is active under FLAT_HIGH_RATE_NORMAL; oil state is OIL_LEVEL_HIGH.</td>
+    </tr>
+    <tr>
+      <td>2026-06-12</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>CASH</td>
       <td>0.00%</td>
@@ -118,7 +138,7 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
     </tr>
   </tbody>
 </table>
-<p class="note">The current state is FLAT_HIGH_RATE_NORMAL. Under this state, the final strategy target allocation is GOLD / CMDTY_FUT. The current weights are generated by the final allocation rule and held until the next scheduled or state-driven rebalance. Weights are based on realized volatility over the final strategy lookback window.</p>
+<p class="note">The current state is FLAT_HIGH_RATE_NORMAL. Under this state, the final strategy target allocation is IEF / DBC. The current weights are generated by the final allocation rule and held until the next scheduled or state-driven rebalance. Weights are based on realized volatility over the final strategy lookback window. Because oil is HIGH, the flat sleeve removes GOLD and DBB where applicable.</p>
 </section>
 <section>
 <h2>Dynamic Weights Since Current Regime Start</h2>
@@ -138,30 +158,21 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
   </thead>
   <tbody>
     <tr>
-      <td>2026-05-01</td>
-      <td>scheduled_rebalance</td>
-      <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>GOLD 42.86%, CMDTY_FUT 57.14%</td>
-      <td>GOLD 48.15%, CMDTY_FUT 51.85%</td>
-      <td></td>
-    </tr>
-    <tr>
       <td>2026-04-07</td>
       <td>stress_unlock</td>
       <td>FLAT_HIGH_RATE_STRESS</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>GOLD 12.86%, CMDTY_FUT 17.14%, IEF 70.00%</td>
-      <td>GOLD 42.86%, CMDTY_FUT 57.14%</td>
+      <td>DBA 100.00%</td>
+      <td>IEF 40.00%, DBC 60.00%</td>
       <td></td>
     </tr>
     <tr>
-      <td>2026-04-01</td>
-      <td>scheduled_rebalance</td>
+      <td>2026-03-18</td>
+      <td>inverse_vol_update</td>
       <td>FLAT_HIGH_RATE_STRESS</td>
       <td>FLAT_HIGH_RATE_STRESS</td>
-      <td>GOLD 10.57%, CMDTY_FUT 19.43%, IEF 70.00%</td>
-      <td>GOLD 12.86%, CMDTY_FUT 17.14%, IEF 70.00%</td>
+      <td>GOLD 90.00%, DBA 10.00%</td>
+      <td>DBA 100.00%</td>
       <td>VIX</td>
     </tr>
     <tr>
@@ -169,8 +180,8 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>stress_entry</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>FLAT_HIGH_RATE_STRESS</td>
-      <td>GOLD 35.22%, CMDTY_FUT 64.78%</td>
-      <td>GOLD 10.57%, CMDTY_FUT 19.43%, IEF 70.00%</td>
+      <td>GOLD 20.78%, IEF 40.00%, DBC 39.22%</td>
+      <td>GOLD 90.00%, DBA 10.00%</td>
       <td>VIX</td>
     </tr>
     <tr>
@@ -178,8 +189,8 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>scheduled_rebalance</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>GOLD 35.18%, CMDTY_FUT 64.82%</td>
-      <td>GOLD 35.22%, CMDTY_FUT 64.78%</td>
+      <td>GOLD 20.53%, IEF 40.00%, DBC 39.47%</td>
+      <td>GOLD 20.78%, IEF 40.00%, DBC 39.22%</td>
       <td></td>
     </tr>
     <tr>
@@ -187,8 +198,8 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>scheduled_rebalance</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>GOLD 38.58%, CMDTY_FUT 61.42%</td>
-      <td>GOLD 35.18%, CMDTY_FUT 64.82%</td>
+      <td>GOLD 22.02%, IEF 40.00%, DBC 37.98%</td>
+      <td>GOLD 20.53%, IEF 40.00%, DBC 39.47%</td>
       <td></td>
     </tr>
     <tr>
@@ -196,8 +207,8 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>scheduled_rebalance</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>GOLD 38.69%, CMDTY_FUT 61.31%</td>
-      <td>GOLD 38.58%, CMDTY_FUT 61.42%</td>
+      <td>GOLD 22.46%, IEF 40.00%, DBC 37.54%</td>
+      <td>GOLD 22.02%, IEF 40.00%, DBC 37.98%</td>
       <td></td>
     </tr>
     <tr>
@@ -205,8 +216,8 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>scheduled_rebalance</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>GOLD 37.72%, CMDTY_FUT 62.28%</td>
-      <td>GOLD 38.69%, CMDTY_FUT 61.31%</td>
+      <td>GOLD 22.40%, IEF 40.00%, DBC 37.60%</td>
+      <td>GOLD 22.46%, IEF 40.00%, DBC 37.54%</td>
       <td></td>
     </tr>
     <tr>
@@ -214,8 +225,8 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>stress_unlock</td>
       <td>FLAT_HIGH_RATE_STRESS</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
-      <td>GOLD 11.32%, CMDTY_FUT 18.68%, IEF 70.00%</td>
-      <td>GOLD 37.72%, CMDTY_FUT 62.28%</td>
+      <td>GOLD 90.00%, DBA 10.00%</td>
+      <td>GOLD 22.40%, IEF 40.00%, DBC 37.60%</td>
       <td></td>
     </tr>
     <tr>
@@ -223,9 +234,18 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>stress_entry</td>
       <td>FLAT_HIGH_RATE_NORMAL</td>
       <td>FLAT_HIGH_RATE_STRESS</td>
-      <td>GOLD 37.72%, CMDTY_FUT 62.28%</td>
-      <td>GOLD 11.32%, CMDTY_FUT 18.68%, IEF 70.00%</td>
+      <td>GOLD 22.40%, IEF 40.00%, DBC 37.60%</td>
+      <td>GOLD 90.00%, DBA 10.00%</td>
       <td>VIX</td>
+    </tr>
+    <tr>
+      <td>2025-11-03</td>
+      <td>scheduled_rebalance</td>
+      <td>FLAT_HIGH_RATE_NORMAL</td>
+      <td>FLAT_HIGH_RATE_NORMAL</td>
+      <td>GOLD 29.96%, IEF 40.00%, DBC 30.04%</td>
+      <td>GOLD 22.40%, IEF 40.00%, DBC 37.60%</td>
+      <td></td>
     </tr>
   </tbody>
 </table>
@@ -233,6 +253,8 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
 <section>
 <h2>Signal Distance</h2>
 <div class="signal-grid">
+<img class="plot" src="figures/current_signal_term_spread.png" alt="Term spread monitor">
+<img class="plot" src="figures/current_signal_oil_level.png" alt="Oil level monitor">
 <img class="plot" src="figures/current_signal_vix_zscore.png" alt="VIX Z-score monitor">
 <img class="plot" src="figures/current_signal_credit_15d_change.png" alt="Credit 15D change monitor">
 <img class="plot" src="figures/current_signal_credit_level_z.png" alt="Credit level Z monitor">
@@ -254,83 +276,101 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
     <tr>
       <td>VIX</td>
       <td>VIX Z-score</td>
-      <td>-0.60</td>
+      <td>-0.39</td>
       <td>3.00</td>
-      <td>-3.60</td>
+      <td>-3.39</td>
       <td>below entry</td>
       <td>VIX stress entry is active at or above 3.0 z-score.</td>
     </tr>
     <tr>
       <td>VIX</td>
       <td>VIX Z-score</td>
-      <td>-0.60</td>
+      <td>-0.39</td>
       <td>1.50</td>
-      <td>-2.10</td>
-      <td>unlock condition met</td>
+      <td>-1.89</td>
+      <td>unlock not met</td>
       <td>VIX lock unlock also requires SPY above MA20.</td>
     </tr>
     <tr>
       <td>Credit</td>
       <td>Credit 15D change</td>
-      <td>-0.06</td>
+      <td>-0.03</td>
       <td>0.10</td>
-      <td>-0.16</td>
+      <td>-0.13</td>
       <td>below entry</td>
       <td>Credit lock entry also requires SPY below MA20.</td>
     </tr>
     <tr>
       <td>Credit</td>
       <td>Credit level Z</td>
-      <td>-1.44</td>
+      <td>-1.98</td>
       <td>0.90</td>
-      <td>-2.34</td>
+      <td>-2.88</td>
       <td>unlock condition met</td>
       <td>Credit unlock also requires SPY above MA50.</td>
     </tr>
     <tr>
       <td>SPY trend</td>
       <td>SPY vs MA20</td>
-      <td>750.59</td>
-      <td>733.36</td>
-      <td>17.24</td>
-      <td>above MA20</td>
+      <td>741.75</td>
+      <td>745.07</td>
+      <td>-3.32</td>
+      <td>below MA20</td>
       <td>Positive distance means SPY is above MA20.</td>
     </tr>
     <tr>
       <td>SPY trend</td>
       <td>SPY vs MA50</td>
-      <td>750.59</td>
-      <td>698.30</td>
-      <td>52.29</td>
+      <td>741.75</td>
+      <td>722.80</td>
+      <td>18.95</td>
       <td>above MA50</td>
       <td>Positive distance means SPY is above MA50.</td>
     </tr>
     <tr>
       <td>SPY trend</td>
       <td>SPY drawdown from previous high</td>
-      <td>0.00</td>
+      <td>-0.02</td>
       <td>-0.05</td>
-      <td>0.05</td>
+      <td>0.03</td>
       <td>above drawdown monitor</td>
       <td>Drawdown is monitored as context for risk stress.</td>
     </tr>
     <tr>
       <td>Regime variables</td>
       <td>Term spread boundary</td>
-      <td>0.70</td>
-      <td>1.00</td>
-      <td>-0.30</td>
-      <td>FLAT/INVERTED side</td>
-      <td>Above 1.0 is raw STEEP; below 0 is raw INVERTED.</td>
+      <td>0.62</td>
+      <td>1.20</td>
+      <td>-0.58</td>
+      <td>below steep entry</td>
+      <td>Outer macro regime uses hysteresis, not a single 0/1 threshold.</td>
+    </tr>
+    <tr>
+      <td>Oil level</td>
+      <td>Oil price vs 252d MA</td>
+      <td>0.18</td>
+      <td>0.20</td>
+      <td>-0.02</td>
+      <td>below HIGH entry</td>
+      <td>Oil HIGH removes GOLD and DBB from flat sleeves.</td>
+    </tr>
+    <tr>
+      <td>Oil level</td>
+      <td>Oil price vs 252d MA</td>
+      <td>0.18</td>
+      <td>-0.20</td>
+      <td>0.38</td>
+      <td>above LOW entry</td>
+      <td>Oil LOW keeps the flat sleeves fully open.</td>
     </tr>
     <tr>
       <td>Regime variables</td>
       <td>Nearest regime boundary</td>
-      <td>0.70</td>
+      <td>0.62</td>
       <td>1.00</td>
-      <td>-0.30</td>
+      <td>-0.38</td>
       <td>away from boundary</td>
-      <td>Current regime is FLAT_HIGH_RATE; nearest boundary is term spread flat/steep boundary.</td>
+      <td>Current regime is FLAT_HIGH_RATE; nearest boundary is steep-&gt;flat threshold.</td>
     </tr>
   </tbody>
 </table>
@@ -355,112 +395,112 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
   </thead>
   <tbody>
     <tr>
-      <td>2026-05-08</td>
-      <td>+0.77%</td>
-      <td>+0.83%</td>
-      <td>1.48</td>
-      <td>1.2649</td>
-      <td>-2.08%</td>
-      <td>0.00%</td>
-    </tr>
-    <tr>
-      <td>2026-05-11</td>
-      <td>+1.14%</td>
-      <td>+0.23%</td>
-      <td>1.50</td>
-      <td>1.2678</td>
-      <td>-0.96%</td>
-      <td>0.00%</td>
-    </tr>
-    <tr>
-      <td>2026-05-12</td>
-      <td>+0.89%</td>
-      <td>-0.15%</td>
-      <td>1.51</td>
-      <td>1.2659</td>
-      <td>-0.08%</td>
-      <td>-0.15%</td>
-    </tr>
-    <tr>
-      <td>2026-05-13</td>
-      <td>-0.55%</td>
+      <td>2026-05-28</td>
       <td>+0.56%</td>
-      <td>1.51</td>
-      <td>1.2729</td>
-      <td>-0.63%</td>
+      <td>+0.55%</td>
+      <td>1.48</td>
+      <td>1.2971</td>
+      <td>-3.46%</td>
       <td>0.00%</td>
     </tr>
     <tr>
-      <td>2026-05-14</td>
-      <td>-0.82%</td>
-      <td>+0.79%</td>
-      <td>1.49</td>
-      <td>1.2830</td>
-      <td>-1.45%</td>
+      <td>2026-05-29</td>
+      <td>-0.44%</td>
+      <td>+0.25%</td>
+      <td>1.48</td>
+      <td>1.3004</td>
+      <td>-3.89%</td>
       <td>0.00%</td>
     </tr>
     <tr>
-      <td>2026-05-15</td>
-      <td>-0.49%</td>
-      <td>-1.20%</td>
+      <td>2026-06-01</td>
+      <td>+0.97%</td>
+      <td>+0.27%</td>
       <td>1.49</td>
-      <td>1.2676</td>
-      <td>-1.93%</td>
-      <td>-1.20%</td>
+      <td>1.3039</td>
+      <td>-2.96%</td>
+      <td>0.00%</td>
     </tr>
     <tr>
-      <td>2026-05-18</td>
-      <td>+0.04%</td>
-      <td>-0.07%</td>
-      <td>1.49</td>
-      <td>1.2667</td>
-      <td>-1.90%</td>
-      <td>-1.27%</td>
+      <td>2026-06-02</td>
+      <td>+0.29%</td>
+      <td>+0.14%</td>
+      <td>1.50</td>
+      <td>1.3057</td>
+      <td>-2.67%</td>
+      <td>0.00%</td>
     </tr>
     <tr>
-      <td>2026-05-19</td>
-      <td>-0.95%</td>
-      <td>-0.67%</td>
-      <td>1.47</td>
-      <td>1.2582</td>
-      <td>-2.82%</td>
-      <td>-1.93%</td>
-    </tr>
-    <tr>
-      <td>2026-05-20</td>
-      <td>-0.80%</td>
-      <td>+1.02%</td>
-      <td>1.46</td>
-      <td>1.2711</td>
-      <td>-3.60%</td>
-      <td>-0.92%</td>
-    </tr>
-    <tr>
-      <td>2026-05-21</td>
+      <td>2026-06-03</td>
+      <td>+0.24%</td>
       <td>-0.70%</td>
-      <td>+0.20%</td>
-      <td>1.45</td>
-      <td>1.2736</td>
-      <td>-4.28%</td>
-      <td>-0.73%</td>
+      <td>1.50</td>
+      <td>1.2965</td>
+      <td>-2.44%</td>
+      <td>-0.70%</td>
     </tr>
     <tr>
-      <td>2026-05-22</td>
-      <td>-0.37%</td>
-      <td>+0.39%</td>
-      <td>1.45</td>
-      <td>1.2786</td>
-      <td>-4.64%</td>
-      <td>-0.34%</td>
+      <td>2026-06-04</td>
+      <td>-0.76%</td>
+      <td>+0.38%</td>
+      <td>1.49</td>
+      <td>1.3014</td>
+      <td>-3.19%</td>
+      <td>-0.33%</td>
     </tr>
     <tr>
-      <td>2026-05-26</td>
-      <td>-1.03%</td>
-      <td>+0.66%</td>
-      <td>1.43</td>
-      <td>1.2871</td>
-      <td>-5.63%</td>
-      <td>0.00%</td>
+      <td>2026-06-05</td>
+      <td>-1.52%</td>
+      <td>-2.58%</td>
+      <td>1.47</td>
+      <td>1.2678</td>
+      <td>-4.66%</td>
+      <td>-2.90%</td>
+    </tr>
+    <tr>
+      <td>2026-06-08</td>
+      <td>+0.45%</td>
+      <td>+0.23%</td>
+      <td>1.47</td>
+      <td>1.2707</td>
+      <td>-4.23%</td>
+      <td>-2.68%</td>
+    </tr>
+    <tr>
+      <td>2026-06-09</td>
+      <td>-0.70%</td>
+      <td>-0.29%</td>
+      <td>1.46</td>
+      <td>1.2670</td>
+      <td>-4.90%</td>
+      <td>-2.96%</td>
+    </tr>
+    <tr>
+      <td>2026-06-10</td>
+      <td>+0.17%</td>
+      <td>-1.58%</td>
+      <td>1.46</td>
+      <td>1.2470</td>
+      <td>-4.74%</td>
+      <td>-4.49%</td>
+    </tr>
+    <tr>
+      <td>2026-06-11</td>
+      <td>-0.38%</td>
+      <td>+1.70%</td>
+      <td>1.46</td>
+      <td>1.2682</td>
+      <td>-5.10%</td>
+      <td>-2.87%</td>
+    </tr>
+    <tr>
+      <td>2026-06-12</td>
+      <td>-0.69%</td>
+      <td>+0.54%</td>
+      <td>1.45</td>
+      <td>1.2750</td>
+      <td>-5.76%</td>
+      <td>-2.35%</td>
     </tr>
   </tbody>
 </table>
@@ -495,11 +535,11 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>VIX</td>
       <td>10</td>
       <td>+2.72%</td>
-      <td>+0.42%</td>
+      <td>+3.73%</td>
       <td>+0.16%</td>
       <td>-1.33%</td>
-      <td>-0.65%</td>
-      <td>-0.68%</td>
+      <td>-1.30%</td>
+      <td>-0.03%</td>
     </tr>
     <tr>
       <td>2</td>
@@ -508,11 +548,11 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>CREDIT+VIX</td>
       <td>14</td>
       <td>+1.86%</td>
-      <td>-0.45%</td>
+      <td>+6.82%</td>
       <td>+0.23%</td>
       <td>-6.33%</td>
-      <td>-1.87%</td>
-      <td>-4.46%</td>
+      <td>-3.28%</td>
+      <td>-3.05%</td>
     </tr>
     <tr>
       <td>3</td>
@@ -521,11 +561,11 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>VIX</td>
       <td>5</td>
       <td>+2.26%</td>
-      <td>+0.04%</td>
+      <td>+1.09%</td>
       <td>+0.07%</td>
       <td>-1.52%</td>
-      <td>-0.02%</td>
-      <td>-1.51%</td>
+      <td>-0.25%</td>
+      <td>-1.28%</td>
     </tr>
     <tr>
       <td>4</td>
@@ -534,25 +574,25 @@ ul { background: white; border: 1px solid #d9dee5; border-radius: 8px; padding: 
       <td>VIX</td>
       <td>20</td>
       <td>-1.73%</td>
-      <td>+0.00%</td>
+      <td>-0.50%</td>
       <td>+0.28%</td>
       <td>-6.57%</td>
-      <td>-3.26%</td>
-      <td>-3.31%</td>
+      <td>-3.50%</td>
+      <td>-3.07%</td>
     </tr>
   </tbody>
 </table>
 </section>
-<section><h2>Warnings</h2><ul><li>DTB3 latest date 2026-05-22 lags newest available data date 2026-05-26.</li><li>DBAA latest date 2026-05-21 lags newest available data date 2026-05-26.</li><li>DAAA latest date 2026-05-21 lags newest available data date 2026-05-26.</li><li>DGS10 latest date 2026-05-22 lags newest available data date 2026-05-26.</li><li>DGS1 latest date 2026-05-22 lags newest available data date 2026-05-26.</li><li>CASH latest date 2026-05-22 lags newest available data date 2026-05-26.</li><li>VIXCLS latest date 2026-05-25 is earlier than SPY 2026-05-26; using common strategy panel date 2026-05-26.</li></ul></section>
+<section><h2>Warnings</h2><ul><li>Asset price download failed for SPY (SPY): empty yfinance response</li><li>Asset price download failed for GOLD (GLD): empty yfinance response</li><li>Asset price download failed for IEF (IEF): empty yfinance response</li><li>Asset price download failed for DBC (DBC): empty yfinance response</li><li>Asset price download failed for DBB (DBB): empty yfinance response</li><li>Asset price download failed for DBA (DBA): empty yfinance response</li><li>Asset price download failed for OIL_SIGNAL (CL=F): empty yfinance response</li><li>Using existing asset price cache because incremental yfinance download did not return usable data.</li><li>Using local processed asset price fallback because yfinance download did not return usable data.</li><li>Extended or backfilled live asset series from local data: SPY, GOLD, IEF.</li><li>Asset panel truncated to common latest date 2026-06-12; per-asset latest dates: SPY=2026-06-12, GOLD=2026-06-12, IEF=2026-06-15, DBC=2026-06-12, DBB=2026-06-12, DBA=2026-06-12, OIL_SIGNAL=2026-06-12.</li></ul></section>
 <section>
 <h2>All Regime Interpretations</h2>
-<details><summary>FLAT_LOW_RATE</summary><ul><li><strong>Economic Meaning:</strong> A flat curve with low long rates usually points to subdued nominal growth expectations and limited rate pressure.</li><li><strong>Typical Risk:</strong> The main risk is that defensive rate-sensitive exposure can lag if growth risk fades quickly.</li><li><strong>Preferred Assets:</strong> The final strategy uses SPY and commodity futures in the normal state.</li><li><strong>Stress Behavior:</strong> Stress locks move the sleeve to cash for FLAT_LOW/MID stress states.</li><li><strong>Monitoring Focus:</strong> Watch VIX, credit widening, and whether the curve shifts out of the flat regime.</li></ul></details>
-<details><summary>FLAT_MID_RATE</summary><ul><li><strong>Economic Meaning:</strong> A flat curve with mid-level rates is a balanced but late-cycle-looking state.</li><li><strong>Typical Risk:</strong> Risk assets can still work, but the flat curve leaves less cushion if credit or volatility deteriorates.</li><li><strong>Preferred Assets:</strong> The final strategy uses SPY and gold in the normal state.</li><li><strong>Stress Behavior:</strong> Stress locks move the sleeve to cash for FLAT_LOW/MID stress states.</li><li><strong>Monitoring Focus:</strong> Watch VIX, credit widening, and SPY trend confirmation.</li></ul></details>
-<details><summary>FLAT_HIGH_RATE</summary><ul><li><strong>Economic Meaning:</strong> A flat curve with high long rates reflects elevated rate pressure while the curve is not steep enough to signal a broad pro-growth steep regime.</li><li><strong>Typical Risk:</strong> Equity beta can be vulnerable if high rates tighten financial conditions or credit spreads widen.</li><li><strong>Preferred Assets:</strong> The final strategy emphasizes gold and commodity futures in the normal state.</li><li><strong>Stress Behavior:</strong> Stress shifts toward a 70% IEF sleeve plus 30% gold/commodity inverse-vol exposure.</li><li><strong>Monitoring Focus:</strong> Watch the term spread boundary near STEEP, credit spread changes, and VIX shocks.</li></ul></details>
-<details><summary>STEEP_LOW_RATE</summary><ul><li><strong>Economic Meaning:</strong> A steep curve with low long rates often reflects recovery expectations while policy remains easy.</li><li><strong>Typical Risk:</strong> The main risk is a failed recovery or a commodity reversal.</li><li><strong>Preferred Assets:</strong> The final strategy uses SPY and commodity futures in the normal state.</li><li><strong>Stress Behavior:</strong> If an existing stress lock carries into this state, the strategy holds SPY until unlock.</li><li><strong>Monitoring Focus:</strong> Watch regime persistence, SPY trend, and commodity momentum.</li></ul></details>
+<details><summary>FLAT_LOW_RATE</summary><ul><li><strong>Economic Meaning:</strong> A flat curve with low long rates usually points to subdued nominal growth expectations and limited rate pressure.</li><li><strong>Typical Risk:</strong> The main risk is that defensive rate-sensitive exposure can lag if growth risk fades quickly.</li><li><strong>Preferred Assets:</strong> The final strategy uses SPY, DBC, and DBB inverse-vol in the normal state; if oil is HIGH, DBB is removed.</li><li><strong>Stress Behavior:</strong> Stress locks move the sleeve to cash for FLAT_LOW/MID stress states.</li><li><strong>Monitoring Focus:</strong> Watch VIX, credit widening, oil level, and whether the curve shifts out of the flat regime.</li></ul></details>
+<details><summary>FLAT_MID_RATE</summary><ul><li><strong>Economic Meaning:</strong> A flat curve with mid-level rates is a balanced but late-cycle-looking state.</li><li><strong>Typical Risk:</strong> Risk assets can still work, but the flat curve leaves less cushion if credit or volatility deteriorates.</li><li><strong>Preferred Assets:</strong> The final strategy uses SPY and gold inverse-vol in the normal state; if oil is HIGH, the sleeve collapses to SPY.</li><li><strong>Stress Behavior:</strong> Stress locks move the sleeve to cash for FLAT_LOW/MID stress states.</li><li><strong>Monitoring Focus:</strong> Watch VIX, credit widening, SPY trend confirmation, and whether oil HIGH removes gold from the flat sleeve.</li></ul></details>
+<details><summary>FLAT_HIGH_RATE</summary><ul><li><strong>Economic Meaning:</strong> A flat curve with high long rates reflects elevated rate pressure while the curve is not steep enough to signal a broad pro-growth steep regime.</li><li><strong>Typical Risk:</strong> Equity beta can be vulnerable if high rates tighten financial conditions or credit spreads widen.</li><li><strong>Preferred Assets:</strong> The final strategy uses 40% IEF plus 60% gold/DBC inverse-vol in the normal state; if oil is HIGH, gold is removed from the floating sleeve.</li><li><strong>Stress Behavior:</strong> Stress shifts to 10% DBA plus 90% gold; if oil is HIGH, the sleeve collapses to 100% DBA.</li><li><strong>Monitoring Focus:</strong> Watch the term spread boundary near STEEP, credit spread changes, VIX shocks, and oil level changes.</li></ul></details>
+<details><summary>STEEP_LOW_RATE</summary><ul><li><strong>Economic Meaning:</strong> A steep curve with low long rates often reflects recovery expectations while policy remains easy.</li><li><strong>Typical Risk:</strong> The main risk is a failed recovery or a commodity reversal.</li><li><strong>Preferred Assets:</strong> The final strategy holds 100% SPY in the normal state.</li><li><strong>Stress Behavior:</strong> If an existing stress lock carries into this state, the strategy holds SPY until unlock.</li><li><strong>Monitoring Focus:</strong> Watch regime persistence, SPY trend, and whether stress carries over from the previous state.</li></ul></details>
 <details><summary>STEEP_MID_RATE</summary><ul><li><strong>Economic Meaning:</strong> A steep curve with mid-level long rates is typically the cleanest pro-growth state.</li><li><strong>Typical Risk:</strong> The main risk is a fast volatility or credit shock that breaks the growth trend.</li><li><strong>Preferred Assets:</strong> The final strategy holds SPY in the normal state.</li><li><strong>Stress Behavior:</strong> Stress shifts to IEF.</li><li><strong>Monitoring Focus:</strong> Watch credit spread changes, SPY trend, and whether rates move into the high bucket.</li></ul></details>
-<details><summary>STEEP_HIGH_RATE</summary><ul><li><strong>Economic Meaning:</strong> A steep curve with high long rates can combine growth participation with inflation or rate pressure.</li><li><strong>Typical Risk:</strong> Equities can still participate, but rate-sensitive valuation pressure and commodity shocks matter.</li><li><strong>Preferred Assets:</strong> The final strategy uses 70% gold plus 30% inverse-vol SPY and commodity futures in the normal state.</li><li><strong>Stress Behavior:</strong> Stress shifts to IEF.</li><li><strong>Monitoring Focus:</strong> Watch credit widening, VIX, and whether the term spread compresses back into FLAT.</li></ul></details>
-<details><summary>INVERTED</summary><ul><li><strong>Economic Meaning:</strong> An inverted curve usually reflects restrictive policy and elevated recession risk.</li><li><strong>Typical Risk:</strong> Equity drawdowns and credit stress can appear with a lag after inversion.</li><li><strong>Preferred Assets:</strong> The final strategy uses SPY and gold in the normal state.</li><li><strong>Stress Behavior:</strong> Stress keeps 10% cash and 90% inverse-vol SPY/gold exposure.</li><li><strong>Monitoring Focus:</strong> Watch credit level z-score, VIX unlock conditions, and SPY trend.</li></ul></details>
+<details><summary>STEEP_HIGH_RATE</summary><ul><li><strong>Economic Meaning:</strong> A steep curve with high long rates can combine growth participation with inflation or rate pressure.</li><li><strong>Typical Risk:</strong> Equities can still participate, but rate-sensitive valuation pressure and commodity shocks matter.</li><li><strong>Preferred Assets:</strong> The final strategy uses SPY and gold inverse-vol in the normal state.</li><li><strong>Stress Behavior:</strong> Stress shifts to IEF.</li><li><strong>Monitoring Focus:</strong> Watch credit widening, VIX, and whether the term spread compresses back into FLAT.</li></ul></details>
+<details><summary>INVERTED</summary><ul><li><strong>Economic Meaning:</strong> An inverted curve usually reflects restrictive policy and elevated recession risk.</li><li><strong>Typical Risk:</strong> Equity drawdowns and credit stress can appear with a lag after inversion.</li><li><strong>Preferred Assets:</strong> The final strategy uses SPY and gold in the normal state.</li><li><strong>Stress Behavior:</strong> Stress keeps 90% cash and 10% SPY.</li><li><strong>Monitoring Focus:</strong> Watch credit level z-score, VIX unlock conditions, and SPY trend.</li></ul></details>
 </section>
 <footer>This dashboard is generated from historical and latest available data. It is research output, not investment advice.</footer>
 </main>
