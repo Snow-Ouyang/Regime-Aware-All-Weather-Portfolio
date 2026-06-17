@@ -135,6 +135,10 @@ The mainline outputs both:
 - `oil level x stress`
 - `oil level x non-stress rate regime`
 
+The sequence chart below shows the raw oil price with persistent `HIGH` and `LOW` regime background shading.
+
+![Oil level regime background](results/main_pipeline_final/figures/oil_level_regime_background.png)
+
 ### Oil x Stress
 
 ![Oil x stress return heatmap](results/main_pipeline_final/figures/oil_stress_asset_behavior_heatmap.png)

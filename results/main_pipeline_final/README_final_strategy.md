@@ -74,6 +74,7 @@ Pure regime x stress outputs are also written into the mainline output set:
 - `results/main_pipeline_final/figures/pure_regime_stress_asset_behavior_heatmap.png`
 - `results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png`
 - `results/main_pipeline_final/tables/pure_cross_state_asset_behavior.csv`
+- `results/main_pipeline_final/figures/oil_level_regime_background.png`
 - `results/main_pipeline_final/figures/oil_stress_asset_behavior_heatmap.png`
 - `results/main_pipeline_final/figures/oil_nonrisk_rate_asset_behavior_heatmap.png`
 - `results/main_pipeline_final/figures/oil_stress_coverage_heatmap.png`
@@ -163,3 +164,17 @@ The corresponding mainline figures are:
 
 - `results/main_pipeline_final/figures/term_spread_full_sample_kde_hmm.png`
 - `results/main_pipeline_final/figures/term_spread_non_inverted_kde_hmm.png`
+
+
+## Oil Level Layer
+
+The oil level layer is part of the canonical mainline output. The chart below shows raw oil price with shaded persistent `HIGH` and `LOW` regime backgrounds:
+
+![Oil level regime background](figures/oil_level_regime_background.png)
+
+Cross-state outputs:
+
+- `figures/oil_stress_asset_behavior_heatmap.png`
+- `figures/oil_stress_coverage_heatmap.png`
+- `figures/oil_nonrisk_rate_asset_behavior_heatmap.png`
+- `figures/oil_nonrisk_rate_coverage_heatmap.png`
