@@ -17,6 +17,16 @@ FINAL = FINAL_STRATEGY
 BASE = REFINED_BASELINE
 SPY = SPY_BUY_HOLD
 DISPLAY_STRATEGIES = [SPY_BUY_HOLD, SPY_CASH_TIMING, FINAL_STRATEGY]
+RATE_STATE_ORDER = [
+    "FLAT_LOW_RATE",
+    "FLAT_MID_RATE",
+    "FLAT_HIGH_RATE",
+    "STEEP_LOW_RATE",
+    "STEEP_MID_RATE",
+    "STEEP_HIGH_RATE",
+    "INVERTED",
+]
+OIL_LEVEL_ORDER = ["OIL_LEVEL_LOW", "OIL_LEVEL_MID", "OIL_LEVEL_HIGH"]
 
 STATE_ORDER = [
     "FLAT_LOW_RATE_NORMAL",
@@ -92,6 +102,20 @@ def pure_cross_state(row: pd.Series) -> str:
     return f"{regime}_{'STRESS' if stress else 'NORMAL'}"
 
 
+def short_oil_label(value: str) -> str:
+    return value.replace("OIL_LEVEL_", "OIL_")
+
+
+def oil_stress_cross_state(row: pd.Series) -> str:
+    return f"{short_oil_label(str(row['oil_level_regime']))}__{str(row['final_state'])}"
+
+
+def oil_nonrisk_rate_cross_state(row: pd.Series) -> str | None:
+    if str(row["final_state"]) != "NON_RISK":
+        return None
+    return f"{str(row['final_regime_confirmed'])}__{short_oil_label(str(row['oil_level_regime']))}"
+
+
 def plot_asset_behavior_heatmap(
     perf: pd.DataFrame,
     group_col: str,
@@ -100,9 +124,11 @@ def plot_asset_behavior_heatmap(
     value_col: str = "annualized_return",
     value_label: str = "Annualized return",
     value_format: str = "percent",
+    column_order: list[str] | None = None,
 ) -> None:
     heat = perf.pivot_table(index="asset", columns=group_col, values=value_col, aggfunc="first")
-    cols = [c for c in STATE_ORDER if c in heat.columns] + [c for c in heat.columns if c not in STATE_ORDER]
+    preferred = column_order if column_order is not None else STATE_ORDER
+    cols = [c for c in preferred if c in heat.columns] + [c for c in heat.columns if c not in preferred]
     heat = heat.reindex(index=ASSETS, columns=cols)
     if value_format == "percent":
         labels = heat.map(lambda x: "" if pd.isna(x) else f"{x:.1%}")
@@ -119,6 +145,39 @@ def plot_asset_behavior_heatmap(
         linewidths=0.5,
         linecolor="white",
         cbar_kws={"label": value_label},
+        ax=ax,
+    )
+    ax.set_title(title)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.tick_params(axis="x", labelrotation=35)
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / path_name, dpi=170)
+    plt.close(fig)
+
+
+def plot_coverage_heatmap(
+    df: pd.DataFrame,
+    row_col: str,
+    col_col: str,
+    value_col: str,
+    path_name: str,
+    title: str,
+    row_order: list[str],
+    col_order: list[str],
+) -> None:
+    heat = df.pivot(index=row_col, columns=col_col, values=value_col).reindex(index=row_order, columns=col_order)
+    labels = heat.map(lambda x: "" if pd.isna(x) else f"{x:.1%}")
+    fig_w = max(8, 1.05 * len(heat.columns))
+    fig, ax = plt.subplots(figsize=(fig_w, 3.8))
+    sns.heatmap(
+        heat,
+        annot=labels,
+        fmt="",
+        cmap="Blues",
+        linewidths=0.5,
+        linecolor="white",
+        cbar_kws={"label": "Coverage of all trading days"},
         ax=ax,
     )
     ax.set_title(title)
@@ -371,6 +430,166 @@ def build_gs10_structure_outputs(
     return summary
 
 
+def build_term_spread_structure_outputs(panel: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def fit_hmm_summary(
+        sub: pd.DataFrame,
+        value_col: str,
+        n_components: int,
+        state_names: dict[int, str],
+        fig_name: str,
+        table_prefix: str,
+        threshold_lines: list[tuple[float, str, str]],
+    ) -> pd.DataFrame:
+        x = sub[[value_col]].to_numpy()
+        gmm = GaussianMixture(n_components=n_components, covariance_type="full", random_state=0, n_init=20)
+        gmm.fit(x)
+        gmm_labels = gmm.predict(x)
+        order = np.argsort(gmm.means_.ravel())
+        remap = {old: new for new, old in enumerate(order)}
+        ordered_means = gmm.means_[order].copy().reshape(-1, 1)
+        ordered_covs = gmm.covariances_[order].copy().reshape(-1, 1, 1)
+        ordered_weights = gmm.weights_[order].copy()
+
+        sorted_labels = np.array([remap[i] for i in gmm_labels], dtype=int)
+        startprob = np.bincount(sorted_labels, minlength=n_components).astype(float)
+        startprob = startprob / startprob.sum()
+        transmat = np.full((n_components, n_components), 1e-3)
+        for a, b in zip(sorted_labels[:-1], sorted_labels[1:]):
+            transmat[a, b] += 1.0
+        transmat = transmat / transmat.sum(axis=1, keepdims=True)
+
+        hmm = GaussianHMM(
+            n_components=n_components,
+            covariance_type="full",
+            n_iter=500,
+            random_state=0,
+            init_params="",
+            params="st",
+        )
+        hmm.startprob_ = startprob
+        hmm.transmat_ = transmat
+        hmm.means_ = ordered_means
+        hmm.covars_ = np.maximum(ordered_covs, 1e-4)
+        hmm.fit(x)
+        states = hmm.predict(x)
+
+        work = sub.copy()
+        work["hmm_state"] = states
+        work["hmm_state_name"] = work["hmm_state"].map(state_names)
+        summary = (
+            work.groupby("hmm_state_name")
+            .agg(
+                n_days=(value_col, "size"),
+                mean_value=(value_col, "mean"),
+                median_value=(value_col, "median"),
+                min_value=(value_col, "min"),
+                max_value=(value_col, "max"),
+            )
+            .reset_index()
+        )
+        summary["model_mean"] = summary["hmm_state_name"].map(
+            {state_names[i]: float(ordered_means[i, 0]) for i in range(n_components)}
+        )
+        summary["model_weight"] = summary["hmm_state_name"].map(
+            {state_names[i]: float(ordered_weights[i]) for i in range(n_components)}
+        )
+        summary = summary.sort_values("model_mean").reset_index(drop=True)
+
+        work[["date", value_col, "hmm_state_name"]].to_csv(TABLE_DIR / f"{table_prefix}_hmm_daily_states.csv", index=False)
+        summary.to_csv(TABLE_DIR / f"{table_prefix}_hmm_summary.csv", index=False)
+
+        fig, axes = plt.subplots(1, 2, figsize=(12.4, 4.8))
+        sns.histplot(data=work, x=value_col, hue="hmm_state_name", stat="count", common_norm=False, bins=32, ax=axes[0], alpha=0.45)
+        axes[0].set_title(f"{table_prefix} histogram")
+        for xline, color, _label in threshold_lines:
+            axes[0].axvline(xline, color=color, linestyle="--", linewidth=1.2, alpha=0.8)
+
+        sns.kdeplot(data=work, x=value_col, hue="hmm_state_name", common_norm=False, ax=axes[1], linewidth=2.0)
+        for state, color in zip(summary["hmm_state_name"], ["#ef4444", "#f59e0b", "#2563eb"][: len(summary)]):
+            state_mean = float(summary.loc[summary["hmm_state_name"].eq(state), "model_mean"].iloc[0])
+            axes[1].axvline(state_mean, color=color, linestyle=":", linewidth=2.0, label=f"{state} mean={state_mean:.2f}")
+        for xline, color, _label in threshold_lines:
+            axes[1].axvline(xline, color=color, linestyle="--", linewidth=1.2, alpha=0.8)
+        axes[1].set_title(f"{table_prefix} KDE + HMM")
+        axes[1].legend(frameon=False, fontsize=8)
+        fig.tight_layout()
+        fig.savefig(FIG_DIR / fig_name, dpi=170)
+        plt.close(fig)
+        return summary
+
+    full_sample = panel[["date", "TERM_SPREAD_10Y_1Y"]].dropna().copy()
+    full_summary = fit_hmm_summary(
+        full_sample,
+        "TERM_SPREAD_10Y_1Y",
+        n_components=3,
+        state_names={0: "INVERTED", 1: "FLAT_ZONE", 2: "STEEP_ZONE"},
+        fig_name="term_spread_full_sample_kde_hmm.png",
+        table_prefix="term_spread_full_sample",
+        threshold_lines=[
+            (-0.10, "#ef4444", "flat->inverted -0.10"),
+            (0.10, "#f97316", "inverted->flat 0.10"),
+            (1.00, "#2563eb", "steep->flat 1.00"),
+            (1.20, "#7c3aed", "flat->steep 1.20"),
+        ],
+    )
+
+    non_inverted = full_sample.loc[full_sample["TERM_SPREAD_10Y_1Y"] >= 0].copy()
+    non_inverted_summary = fit_hmm_summary(
+        non_inverted,
+        "TERM_SPREAD_10Y_1Y",
+        n_components=2,
+        state_names={0: "LOW_POSITIVE", 1: "HIGH_POSITIVE"},
+        fig_name="term_spread_non_inverted_kde_hmm.png",
+        table_prefix="term_spread_non_inverted",
+        threshold_lines=[
+            (-0.10, "#ef4444", "flat->inverted -0.10"),
+            (0.10, "#f97316", "inverted->flat 0.10"),
+            (1.00, "#2563eb", "steep->flat 1.00"),
+            (1.20, "#7c3aed", "flat->steep 1.20"),
+        ],
+    )
+    return full_summary, non_inverted_summary
+
+
+def term_spread_readme_section(full_summary: pd.DataFrame, non_inverted_summary: pd.DataFrame) -> str:
+    def state_line(df: pd.DataFrame, state: str) -> str:
+        row = df.loc[df["hmm_state_name"].eq(state)].iloc[0]
+        return f"- {state}: mean term spread `{float(row['model_mean']):.2f}`, sample weight `{float(row['model_weight']):.1%}`"
+
+    return f"""
+
+## Term Spread Structure and Outer Hysteresis
+
+We also re-ran single-variable HMM + KDE diagnostics directly on `DGS10 - DGS1` to validate the outer `INVERTED / FLAT / STEEP` transition logic.
+
+### Full-sample 3-state term spread HMM
+
+{state_line(full_summary, "INVERTED")}
+{state_line(full_summary, "FLAT_ZONE")}
+{state_line(full_summary, "STEEP_ZONE")}
+
+### Non-inverted 2-state term spread HMM
+
+{state_line(non_inverted_summary, "LOW_POSITIVE")}
+{state_line(non_inverted_summary, "HIGH_POSITIVE")}
+
+Interpretation:
+
+1. The full-sample HMM confirms that negative term spread is structurally distinct from the positive-rate states.
+2. Inside the non-inverted sample, KDE/HMM still shows a low-positive zone and a high-positive zone rather than one single smooth cloud.
+3. That internal structure is why the outer rule now uses hysteresis instead of a single cutoff:
+   - `FLAT -> INVERTED = -0.10`
+   - `INVERTED -> FLAT = 0.10`
+   - `FLAT -> STEEP = 1.20`
+   - `STEEP -> FLAT = 1.00`
+
+The corresponding mainline figures are:
+
+- `results/main_pipeline_final/figures/term_spread_full_sample_kde_hmm.png`
+- `results/main_pipeline_final/figures/term_spread_non_inverted_kde_hmm.png`
+"""
+
+
 def stress_trigger_readme_section(flat_gs10_summary: pd.DataFrame, steep_gs10_summary: pd.DataFrame) -> str:
     def state_line(df: pd.DataFrame, state: str) -> str:
         row = df.loc[df["hmm_state_name"].eq(state)].iloc[0]
@@ -406,7 +625,7 @@ The final regime builder now diagnoses `FLAT` and `STEEP` separately with full-s
   - `HIGH -> MID = 3.0`
   - `MID -> HIGH = 3.2`
 
-- All regime transitions still require `3-day confirm`.
+- All regime transitions use `2-day confirm`.
 
 This does two things:
 
@@ -426,6 +645,8 @@ def main() -> None:
     panel = panel.copy()
     panel["heatmap_cross_state"] = panel.apply(heatmap_cross_state, axis=1)
     panel["pure_cross_state"] = panel.apply(pure_cross_state, axis=1)
+    panel["oil_stress_cross_state"] = panel.apply(oil_stress_cross_state, axis=1)
+    panel["oil_nonrisk_rate_cross_state"] = panel.apply(oil_nonrisk_rate_cross_state, axis=1)
     panel.to_csv(OUT / "daily_backtest_panel.csv", index=False)
     panel.to_csv(TABLE_DIR / "daily_backtest_panel.csv", index=False)
     panel.to_csv(TABLE_DIR / "final_daily_panel.csv", index=False)
@@ -436,9 +657,14 @@ def main() -> None:
     cross_behavior = asset_behavior(panel, "heatmap_cross_state")
     pure_behavior = asset_behavior(panel, "pure_cross_state")
     regime_behavior = asset_behavior(panel, "final_regime_confirmed")
+    oil_stress_behavior = asset_behavior(panel, "oil_stress_cross_state")
+    oil_nonrisk_panel = panel.loc[panel["oil_nonrisk_rate_cross_state"].notna()].copy()
+    oil_nonrisk_behavior = asset_behavior(oil_nonrisk_panel, "oil_nonrisk_rate_cross_state")
     cross_behavior.to_csv(TABLE_DIR / "cross_state_asset_behavior.csv", index=False)
     pure_behavior.to_csv(TABLE_DIR / "pure_cross_state_asset_behavior.csv", index=False)
     regime_behavior.to_csv(TABLE_DIR / "regime_asset_behavior.csv", index=False)
+    oil_stress_behavior.to_csv(TABLE_DIR / "oil_stress_asset_behavior.csv", index=False)
+    oil_nonrisk_behavior.to_csv(TABLE_DIR / "oil_nonrisk_rate_asset_behavior.csv", index=False)
     crisis_performance(panel).to_csv(TABLE_DIR / "crisis_window_performance.csv", index=False)
     (
         panel.groupby("pure_cross_state")
@@ -447,6 +673,20 @@ def main() -> None:
         .sort_values("days", ascending=False)
         .to_csv(TABLE_DIR / "pure_cross_state_day_counts.csv", index=False)
     )
+    oil_stress_coverage = (
+        panel.groupby(["oil_level_regime", "final_state"])
+        .agg(days=("date", "size"))
+        .reset_index()
+        .assign(coverage=lambda df_: df_["days"] / len(panel))
+    )
+    oil_nonrisk_coverage = (
+        oil_nonrisk_panel.groupby(["oil_level_regime", "final_regime_confirmed"])
+        .agg(days=("date", "size"))
+        .reset_index()
+        .assign(coverage=lambda df_: df_["days"] / len(panel))
+    )
+    oil_stress_coverage.to_csv(TABLE_DIR / "oil_stress_coverage.csv", index=False)
+    oil_nonrisk_coverage.to_csv(TABLE_DIR / "oil_nonrisk_rate_coverage.csv", index=False)
 
     panel[["date"] + [f"{FINAL}_weight_{asset}" for asset in ASSETS]].to_csv(TABLE_DIR / "final_daily_weights.csv", index=False)
     panel[
@@ -514,6 +754,67 @@ def main() -> None:
         value_col="Sharpe",
         value_label="Sharpe ratio",
         value_format="number",
+        column_order=RATE_STATE_ORDER,
+    )
+    oil_stress_order = [f"{short_oil_label(oil)}__{stress}" for oil in OIL_LEVEL_ORDER for stress in ["NON_RISK", "FULL_RISK"]]
+    plot_asset_behavior_heatmap(
+        oil_stress_behavior,
+        "oil_stress_cross_state",
+        "oil_stress_asset_behavior_heatmap.png",
+        "Asset Annualized Return by Oil Level x Stress",
+        column_order=oil_stress_order,
+    )
+    plot_asset_behavior_heatmap(
+        oil_stress_behavior,
+        "oil_stress_cross_state",
+        "oil_stress_asset_sharpe_heatmap.png",
+        "Asset Sharpe Ratio by Oil Level x Stress",
+        value_col="Sharpe",
+        value_label="Sharpe ratio",
+        value_format="number",
+        column_order=oil_stress_order,
+    )
+    oil_nonrisk_rate_order = [
+        f"{rate}__{short_oil_label(oil)}"
+        for rate in RATE_STATE_ORDER
+        for oil in OIL_LEVEL_ORDER
+    ]
+    plot_asset_behavior_heatmap(
+        oil_nonrisk_behavior,
+        "oil_nonrisk_rate_cross_state",
+        "oil_nonrisk_rate_asset_behavior_heatmap.png",
+        "Asset Annualized Return by Non-Stress Rate Regime x Oil Level",
+        column_order=oil_nonrisk_rate_order,
+    )
+    plot_asset_behavior_heatmap(
+        oil_nonrisk_behavior,
+        "oil_nonrisk_rate_cross_state",
+        "oil_nonrisk_rate_asset_sharpe_heatmap.png",
+        "Asset Sharpe Ratio by Non-Stress Rate Regime x Oil Level",
+        value_col="Sharpe",
+        value_label="Sharpe ratio",
+        value_format="number",
+        column_order=oil_nonrisk_rate_order,
+    )
+    plot_coverage_heatmap(
+        oil_stress_coverage,
+        "oil_level_regime",
+        "final_state",
+        "coverage",
+        "oil_stress_coverage_heatmap.png",
+        "Coverage of Oil Level x Stress",
+        OIL_LEVEL_ORDER,
+        ["NON_RISK", "FULL_RISK"],
+    )
+    plot_coverage_heatmap(
+        oil_nonrisk_coverage,
+        "oil_level_regime",
+        "final_regime_confirmed",
+        "coverage",
+        "oil_nonrisk_rate_coverage_heatmap.png",
+        "Coverage of Non-Stress Rate Regime x Oil Level",
+        OIL_LEVEL_ORDER,
+        RATE_STATE_ORDER,
     )
 
     flat_gs10_summary = build_gs10_structure_outputs(
@@ -542,21 +843,45 @@ def main() -> None:
         fig_name="steep_gs10_kde_hmm.png",
         table_prefix="steep_gs10",
     )
+    term_spread_full_summary, term_spread_non_inverted_summary = build_term_spread_structure_outputs(panel)
+
+    sample_start = panel["date"].min().strftime("%Y-%m-%d")
+    sample_end = panel["date"].max().strftime("%Y-%m-%d")
+    final_perf = display_perf.loc[display_perf["strategy"].eq(FINAL)].iloc[0]
 
     readme = f"""# Final Source-Only Strategy Outputs
 
 This folder is generated from `data/raw` and `data/processed` only using the canonical source-only settings.
 
+Sample window:
+
+- Start: `{sample_start}`
+- End: `{sample_end}`
+- Trading days: `{len(panel)}`
+
+Final strategy headline metrics:
+
+- CAGR: `{final_perf['CAGR']:.2%}`
+- Annualized volatility: `{final_perf['annualized_volatility']:.2%}`
+- Sharpe: `{final_perf['Sharpe']:.3f}`
+- Max drawdown: `{final_perf['MaxDD']:.2%}`
+- Final equity multiple: `{final_perf['final_equity']:.2f}x`
+
 Final display strategies:
 
 - `SPY_BUY_HOLD`: always 100% SPY.
 - `SPY_CASH_TIMING`: SPY in non-risk, CASH in trigger-lock stress; uses the same VIX/CREDIT anchor state machine as the final hedge strategy.
-- `FINAL_REGIME_HEDGE_TRIGGER_LOCK`: final hedge allocation with six-regime classification, buffered regime transitions, and regime-specific stress sleeves.
+- `FINAL_REGIME_HEDGE_TRIGGER_LOCK`: final hedge allocation with buffered term-spread transitions, oil-aware flat sleeves, expanded commodity ETFs, and the original mainline VIX/CREDIT stress trigger.
 
 Key design choices:
 
 - Credit spread is daily `DBAA - DAAA`, filled to the trading calendar before feature construction.
-- Macro regime has no `NEUTRAL`: `INVERTED`, `FLAT`, `STEEP`, with `3-day confirm`.
+- Macro regime has no `NEUTRAL`: `INVERTED`, `FLAT`, `STEEP`, with outer term-spread hysteresis:
+  - `FLAT -> INVERTED = -0.10`
+  - `INVERTED -> FLAT = 0.10`
+  - `FLAT -> STEEP = 1.20`
+  - `STEEP -> FLAT = 1.00`
+  - outer and inner regime transitions both use `2-day confirm`
 - `FLAT` uses buffered `GS10` low/mid/high bands:
   - `MID -> LOW = 1.1`
   - `LOW -> MID = 1.3`
@@ -570,30 +895,40 @@ Key design choices:
 - `STEEP_LOW_RATE` does not allow native credit entries.
 - Carry-over stress is shown explicitly in the cross-state heatmap. `STEEP_LOW_RATE_STRESS` has no native trigger, but if an active stress period carries into `STEEP_LOW_RATE`, it remains a stress sleeve and is analyzed separately.
 - `CASH_return` uses geometric daily DTB3.
+- Oil level uses a `252-day` oil MA with three persistent states:
+  - `HIGH`: entry at `+20%`, exit at `+5%`
+  - `LOW`: entry at `-20%`, exit at `-10%`
+  - confirmation is `10 trading days`
+- When oil is `HIGH`, flat sleeves remove `GOLD` and `DBB` from the candidate set.
+- Expanded asset set: `SPY`, `GOLD`, `IEF`, `DBC`, `DBB`, `DBA`, `CASH`.
 - Inverse-vol window is 90 trading days.
 - Transaction cost uses 10 bps one-way.
 
 Final allocation settings:
 
-- `FLAT_LOW_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
+- `FLAT_LOW_RATE_NORMAL`: SPY / DBC / DBB inverse-vol, but oil `HIGH` removes `DBB`.
 - `FLAT_MID_RATE_NORMAL`: SPY / GOLD inverse-vol.
 - `FLAT_LOWMID_RATE_STRESS`: 100% CASH.
-- `FLAT_HIGH_RATE_NORMAL`: GOLD / CMDTY_FUT inverse-vol.
-- `FLAT_HIGH_RATE_STRESS`: 70% IEF + 30% (GOLD / CMDTY_FUT inverse-vol).
-- `STEEP_LOW_RATE_NORMAL`: SPY / CMDTY_FUT inverse-vol.
+- `FLAT_HIGH_RATE_NORMAL`: 40% IEF + 60% (GOLD / DBC inverse-vol), but oil `HIGH` removes `GOLD`.
+- `FLAT_HIGH_RATE_STRESS`: 10% DBA + 90% GOLD, but oil `HIGH` collapses this sleeve to 100% DBA.
+- `STEEP_LOW_RATE_NORMAL`: 100% SPY.
 - `STEEP_LOW_RATE_STRESS`: 100% SPY.
 - `STEEP_MID_RATE_NORMAL`: 100% SPY.
 - `STEEP_MID_RATE_STRESS`: 100% IEF.
-- `STEEP_HIGH_RATE_NORMAL`: 70% GOLD + 30% (SPY / CMDTY_FUT inverse-vol).
+- `STEEP_HIGH_RATE_NORMAL`: SPY / GOLD inverse-vol.
 - `STEEP_HIGH_RATE_STRESS`: 100% IEF.
 - `INVERTED_NORMAL`: SPY / GOLD inverse-vol.
-- `INVERTED_STRESS`: 10% CASH + 90% (SPY / GOLD inverse-vol).
+- `INVERTED_STRESS`: 90% CASH + 10% SPY.
 
 Pure regime x stress outputs are also written into the mainline output set:
 
 - `results/main_pipeline_final/figures/pure_regime_stress_asset_behavior_heatmap.png`
 - `results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png`
 - `results/main_pipeline_final/tables/pure_cross_state_asset_behavior.csv`
+- `results/main_pipeline_final/figures/oil_stress_asset_behavior_heatmap.png`
+- `results/main_pipeline_final/figures/oil_nonrisk_rate_asset_behavior_heatmap.png`
+- `results/main_pipeline_final/figures/oil_stress_coverage_heatmap.png`
+- `results/main_pipeline_final/figures/oil_nonrisk_rate_coverage_heatmap.png`
 
 Main run order:
 
@@ -601,8 +936,15 @@ Main run order:
 2. `python scripts/08_stress_trigger_diagnostics.py`
 3. `python scripts/10_final_report_outputs.py`
 4. `python scripts/hard_validate_main_pipeline_source_only.py`
+
+Live dashboard:
+
+- `python scripts/30_generate_live_regime_dashboard.py`
+- Output HTML: `results/live_regime_dashboard/live_regime_dashboard.html`
+- The dashboard uses the same canonical regime, stress, oil-level, and allocation logic as the main strategy and fetches the latest macro plus asset data with cache fallback.
 """
     readme += stress_trigger_readme_section(flat_gs10_summary, steep_gs10_summary)
+    readme += term_spread_readme_section(term_spread_full_summary, term_spread_non_inverted_summary)
     (OUT / "README_final_strategy.md").write_text(readme, encoding="utf-8")
     print("PASS source-only final report outputs")
     print(display_perf.to_string(index=False))
