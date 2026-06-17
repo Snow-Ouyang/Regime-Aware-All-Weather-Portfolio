@@ -229,6 +229,32 @@ CASE_WINDOWS = {
 }
 
 
+def plot_oil_level_regime_background(panel: pd.DataFrame) -> None:
+    sub = panel[["date", "oil_price", "oil_level_regime"]].dropna().copy()
+    if sub.empty:
+        return
+    fig, ax = plt.subplots(figsize=(12, 4.8))
+    ax.plot(sub["date"], sub["oil_price"], color="#1f2937", linewidth=1.6, label="Oil price")
+
+    episode_id = sub["oil_level_regime"].ne(sub["oil_level_regime"].shift()).cumsum()
+    for _, grp in sub.groupby(episode_id):
+        state = str(grp["oil_level_regime"].iloc[0])
+        if state == "OIL_LEVEL_HIGH":
+            ax.axvspan(grp["date"].iloc[0], grp["date"].iloc[-1], color="#ef4444", alpha=0.14, linewidth=0)
+        elif state == "OIL_LEVEL_LOW":
+            ax.axvspan(grp["date"].iloc[0], grp["date"].iloc[-1], color="#2563eb", alpha=0.14, linewidth=0)
+
+    ax.plot([], [], color="#ef4444", linewidth=8, alpha=0.14, label="OIL_LEVEL_HIGH background")
+    ax.plot([], [], color="#2563eb", linewidth=8, alpha=0.14, label="OIL_LEVEL_LOW background")
+    ax.set_title("Oil Price with High/Low Oil Level Regime Background")
+    ax.set_ylabel("Oil price")
+    ax.grid(alpha=0.2)
+    ax.legend(loc="upper left")
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "oil_level_regime_background.png", dpi=170)
+    plt.close(fig)
+
+
 def plot_outputs(panel: pd.DataFrame) -> None:
     fig, ax = plt.subplots(figsize=(11, 5))
     for strategy in DISPLAY_STRATEGIES:
@@ -271,6 +297,8 @@ def plot_outputs(panel: pd.DataFrame) -> None:
     fig.tight_layout()
     fig.savefig(FIG_DIR / "final_strategy_weights_timeline.png", dpi=170)
     plt.close(fig)
+
+    plot_oil_level_regime_background(panel)
 
 
 def plot_performance_bars(perf: pd.DataFrame) -> None:
@@ -925,6 +953,7 @@ Pure regime x stress outputs are also written into the mainline output set:
 - `results/main_pipeline_final/figures/pure_regime_stress_asset_behavior_heatmap.png`
 - `results/main_pipeline_final/figures/pure_regime_stress_asset_sharpe_heatmap.png`
 - `results/main_pipeline_final/tables/pure_cross_state_asset_behavior.csv`
+- `results/main_pipeline_final/figures/oil_level_regime_background.png`
 - `results/main_pipeline_final/figures/oil_stress_asset_behavior_heatmap.png`
 - `results/main_pipeline_final/figures/oil_nonrisk_rate_asset_behavior_heatmap.png`
 - `results/main_pipeline_final/figures/oil_stress_coverage_heatmap.png`
@@ -945,6 +974,21 @@ Live dashboard:
 """
     readme += stress_trigger_readme_section(flat_gs10_summary, steep_gs10_summary)
     readme += term_spread_readme_section(term_spread_full_summary, term_spread_non_inverted_summary)
+    readme += """
+
+## Oil Level Layer
+
+The oil level layer is part of the canonical mainline output. The chart below shows raw oil price with shaded persistent `HIGH` and `LOW` regime backgrounds:
+
+![Oil level regime background](figures/oil_level_regime_background.png)
+
+Cross-state outputs:
+
+- `figures/oil_stress_asset_behavior_heatmap.png`
+- `figures/oil_stress_coverage_heatmap.png`
+- `figures/oil_nonrisk_rate_asset_behavior_heatmap.png`
+- `figures/oil_nonrisk_rate_coverage_heatmap.png`
+"""
     (OUT / "README_final_strategy.md").write_text(readme, encoding="utf-8")
     print("PASS source-only final report outputs")
     print(display_perf.to_string(index=False))
